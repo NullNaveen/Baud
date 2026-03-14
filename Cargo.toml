@@ -41,7 +41,7 @@ tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
 hyper = "1"
 
 # CLI
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 
 # Logging
 tracing = "0.1"

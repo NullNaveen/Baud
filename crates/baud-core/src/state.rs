@@ -6,7 +6,8 @@ use tracing::{debug, warn};
 use crate::crypto::{verify_signature, Address, Hash};
 use crate::error::{BaudError, BaudResult};
 use crate::types::{
-    Account, AgentMeta, Amount, Escrow, EscrowStatus, Transaction, TxPayload,
+    Account, AgentMeta, Amount, Escrow, EscrowStatus, MilestoneEscrow,
+    MilestoneState, SpendingPolicy, Transaction, TxPayload,
 };
 
 // ─── World State ────────────────────────────────────────────────────────────
@@ -18,6 +19,8 @@ pub struct WorldState {
     pub accounts: HashMap<Address, Account>,
     /// All active and finalized escrows indexed by ID.
     pub escrows: HashMap<Hash, Escrow>,
+    /// Milestone-based escrows indexed by ID.
+    pub milestone_escrows: HashMap<Hash, MilestoneEscrow>,
     /// Current block height.
     pub height: u64,
     /// Hash of the last finalized block header.
@@ -31,6 +34,7 @@ impl WorldState {
         Self {
             accounts: HashMap::new(),
             escrows: HashMap::new(),
+            milestone_escrows: HashMap::new(),
             height: 0,
             last_block_hash: Hash::zero(),
             chain_id,
@@ -207,6 +211,60 @@ impl WorldState {
             TxPayload::AgentRegister { .. } => {
                 // No additional state checks needed.
             }
+            TxPayload::MilestoneEscrowCreate { milestones, .. } => {
+                // Sum all milestone amounts and check balance.
+                let total: Amount = milestones
+                    .iter()
+                    .try_fold(0u128, |acc, m| acc.checked_add(m.amount))
+                    .ok_or(BaudError::Overflow)?;
+                if account.balance < total {
+                    return Err(BaudError::InsufficientBalance {
+                        have: account.balance,
+                        need: total,
+                    });
+                }
+            }
+            TxPayload::MilestoneRelease { escrow_id, milestone_index, preimage } => {
+                let escrow = self
+                    .milestone_escrows
+                    .get(escrow_id)
+                    .ok_or_else(|| BaudError::EscrowNotFound(escrow_id.to_hex()))?;
+                if escrow.status != EscrowStatus::Active {
+                    return Err(BaudError::EscrowAlreadyFinalized(escrow_id.to_hex()));
+                }
+                if tx.sender != escrow.recipient {
+                    return Err(BaudError::EscrowUnauthorized(
+                        "only recipient can release milestones".into(),
+                    ));
+                }
+                let idx = *milestone_index as usize;
+                if idx >= escrow.milestones.len() {
+                    return Err(BaudError::MilestoneIndexOutOfRange {
+                        index: *milestone_index,
+                        total: escrow.milestones.len(),
+                    });
+                }
+                if escrow.milestones[idx].completed {
+                    return Err(BaudError::MilestoneAlreadyCompleted {
+                        index: *milestone_index,
+                    });
+                }
+                let preimage_hash = Hash::digest(preimage);
+                if preimage_hash != escrow.milestones[idx].hash_lock {
+                    return Err(BaudError::InvalidEscrowProof(
+                        "preimage does not match milestone hash_lock".into(),
+                    ));
+                }
+                if current_time > escrow.deadline {
+                    return Err(BaudError::EscrowDeadlineExceeded {
+                        current: current_time,
+                        deadline: escrow.deadline,
+                    });
+                }
+            }
+            TxPayload::SetSpendingPolicy { .. } => {
+                // Sender is setting their own policy — no additional checks.
+            }
         }
 
         Ok(())
@@ -348,6 +406,96 @@ impl WorldState {
                     capabilities: capabilities.clone(),
                 });
                 debug!(address = %sender_addr, "agent registered");
+            }
+
+            TxPayload::MilestoneEscrowCreate {
+                recipient,
+                milestones,
+                deadline,
+            } => {
+                // Sum total and debit sender.
+                let total: Amount = milestones
+                    .iter()
+                    .try_fold(0u128, |acc, m| acc.checked_add(m.amount))
+                    .ok_or(BaudError::Overflow)?;
+                {
+                    let sender = self.accounts.get_mut(&sender_addr).unwrap();
+                    sender.balance = sender
+                        .balance
+                        .checked_sub(total)
+                        .ok_or(BaudError::InsufficientBalance {
+                            have: sender.balance,
+                            need: total,
+                        })?;
+                }
+                let escrow_id = tx.hash();
+                let milestone_states: Vec<MilestoneState> = milestones
+                    .iter()
+                    .map(|m| MilestoneState {
+                        amount: m.amount,
+                        hash_lock: m.hash_lock,
+                        completed: false,
+                    })
+                    .collect();
+                let escrow = MilestoneEscrow {
+                    id: escrow_id,
+                    sender: sender_addr,
+                    recipient: *recipient,
+                    total_amount: total,
+                    milestones: milestone_states,
+                    released_amount: 0,
+                    deadline: *deadline,
+                    status: EscrowStatus::Active,
+                    created_at_height: self.height,
+                };
+                self.milestone_escrows.insert(escrow_id, escrow);
+                debug!(escrow_id = %escrow_id, milestones = milestones.len(), total = %total, "milestone escrow created");
+            }
+
+            TxPayload::MilestoneRelease {
+                escrow_id,
+                milestone_index,
+                preimage: _,
+            } => {
+                let escrow = self.milestone_escrows.get_mut(escrow_id).unwrap();
+                let idx = *milestone_index as usize;
+                let amount = escrow.milestones[idx].amount;
+                escrow.milestones[idx].completed = true;
+                escrow.released_amount = escrow
+                    .released_amount
+                    .checked_add(amount)
+                    .ok_or(BaudError::Overflow)?;
+
+                // If all milestones completed, mark escrow as released.
+                if escrow.milestones.iter().all(|m| m.completed) {
+                    escrow.status = EscrowStatus::Released;
+                }
+
+                // Credit recipient.
+                let recipient = escrow.recipient;
+                let rec = self
+                    .accounts
+                    .entry(recipient)
+                    .or_insert_with(|| Account::new(recipient));
+                rec.balance = rec
+                    .balance
+                    .checked_add(amount)
+                    .ok_or(BaudError::Overflow)?;
+                debug!(escrow_id = %escrow_id, milestone = idx, amount = %amount, "milestone released");
+            }
+
+            TxPayload::SetSpendingPolicy {
+                auto_approve_limit,
+                co_signers,
+                required_co_signers,
+            } => {
+                let acc = self.accounts.get_mut(&sender_addr).unwrap();
+                acc.spending_policy = Some(SpendingPolicy {
+                    auto_approve_limit: *auto_approve_limit,
+                    co_signers: co_signers.clone(),
+                    required_co_signers: *required_co_signers,
+                });
+                debug!(address = %sender_addr, limit = %auto_approve_limit, "spending policy set");
             }
         }
 

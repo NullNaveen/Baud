@@ -12,6 +12,9 @@ use tracing::{debug, error, info, warn};
 use baud_consensus::ConsensusMessage;
 use baud_core::crypto::Hash;
 
+/// Maximum network message size (10 MiB). Messages exceeding this are dropped.
+const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
+
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -259,6 +262,12 @@ impl NetworkNode {
 
     /// Process a received network message.
     async fn handle_network_message(&self, raw: &str) {
+        // Security: reject oversized messages before deserialization.
+        if raw.len() > MAX_MESSAGE_SIZE {
+            warn!(size = raw.len(), "dropping oversized network message");
+            return;
+        }
+
         let msg: NetworkMessage = match serde_json::from_str(raw) {
             Ok(m) => m,
             Err(e) => {

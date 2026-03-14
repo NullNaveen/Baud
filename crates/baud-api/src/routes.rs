@@ -199,18 +199,25 @@ impl RateLimiter {
 }
 
 /// Axum middleware that rejects requests exceeding the rate limit.
-/// Note: Uses the direct TCP connection IP (ConnectInfo). If behind a
-/// reverse proxy, configure the proxy to set ConnectInfo correctly.
+/// When behind a reverse proxy, checks X-Forwarded-For to get the real
+/// client IP, falling back to the direct TCP connection IP.
 async fn rate_limit_middleware(
     State(limiter): State<RateLimiter>,
     req: axum::extract::Request,
     next: Next,
 ) -> impl IntoResponse {
-    // Extract client IP from direct TCP connection.
+    // Prefer X-Forwarded-For (first entry = original client), fall back to TCP peer.
     let ip = req
-        .extensions()
-        .get::<ConnectInfo<std::net::SocketAddr>>()
-        .map(|ci| ci.0.ip())
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .and_then(|s| s.trim().parse::<IpAddr>().ok())
+        .or_else(|| {
+            req.extensions()
+                .get::<ConnectInfo<std::net::SocketAddr>>()
+                .map(|ci| ci.0.ip())
+        })
         .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
 
     if limiter.try_acquire(ip) {
@@ -236,12 +243,13 @@ pub fn build_router(state: AppState) -> Router {
 /// Build the router with a custom rate limiter (useful for tests).
 pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Router {
     Router::new()
-        .route("/status", get(get_status))
-        .route("/account/{address}", get(get_account))
-        .route("/tx", post(submit_tx))
-        .route("/tx/{hash}", get(get_tx))
-        .route("/escrow/{id}", get(get_escrow))
-        .route("/mempool", get(get_mempool))
+        .route("/v1/status", get(get_status))
+        .route("/v1/account/{address}", get(get_account))
+        .route("/v1/tx", post(submit_tx))
+        .route("/v1/tx/{hash}", get(get_tx))
+        .route("/v1/escrow/{id}", get(get_escrow))
+        .route("/v1/mempool", get(get_mempool))
+        .route("/v1/metrics", get(get_metrics))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
         .layer(middleware::from_fn_with_state(limiter, rate_limit_middleware))
         .layer(CorsLayer::permissive())
@@ -442,6 +450,45 @@ async fn get_mempool(State(state): State<AppState>) -> impl IntoResponse {
             })
             .collect(),
     })
+}
+
+/// Prometheus-compatible metrics endpoint for monitoring/observability.
+async fn get_metrics(State(state): State<AppState>) -> impl IntoResponse {
+    let ws = state.world_state.read();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let uptime = now.saturating_sub(state.start_time);
+
+    let metrics = format!(
+        "# HELP baud_block_height Current block height\n\
+         # TYPE baud_block_height gauge\n\
+         baud_block_height {}\n\
+         # HELP baud_accounts_total Total number of accounts\n\
+         # TYPE baud_accounts_total gauge\n\
+         baud_accounts_total {}\n\
+         # HELP baud_escrows_total Total number of escrows\n\
+         # TYPE baud_escrows_total gauge\n\
+         baud_escrows_total {}\n\
+         # HELP baud_mempool_size Current mempool size\n\
+         # TYPE baud_mempool_size gauge\n\
+         baud_mempool_size {}\n\
+         # HELP baud_uptime_ms Node uptime in milliseconds\n\
+         # TYPE baud_uptime_ms counter\n\
+         baud_uptime_ms {}\n",
+        ws.height,
+        ws.accounts.len(),
+        ws.escrows.len() + ws.milestone_escrows.len(),
+        state.mempool.len(),
+        uptime,
+    );
+
+    (
+        StatusCode::OK,
+        [("content-type", "text/plain; version=0.0.4; charset=utf-8")],
+        metrics,
+    )
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

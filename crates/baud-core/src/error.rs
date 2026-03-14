@@ -60,6 +60,15 @@ pub enum BaudError {
     #[error("invalid escrow proof: {0}")]
     InvalidEscrowProof(String),
 
+    #[error("invalid milestone count: {count} (max {max})")]
+    InvalidMilestoneCount { count: usize, max: usize },
+
+    #[error("milestone index {index} out of range (total: {total})")]
+    MilestoneIndexOutOfRange { index: u32, total: usize },
+
+    #[error("milestone {index} already completed")]
+    MilestoneAlreadyCompleted { index: u32 },
+
     // ── Block ───────────────────────────────────────────────────────
     #[error("invalid block: {0}")]
     InvalidBlock(String),

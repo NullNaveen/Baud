@@ -74,6 +74,32 @@ pub enum TxPayload {
         /// Capability tags for discovery (e.g., ["llm", "vision"]).
         capabilities: Vec<Vec<u8>>,
     },
+    /// Create a milestone-based escrow with multiple release stages.
+    /// Each milestone has its own hash-lock and amount, enabling sub-task payments.
+    MilestoneEscrowCreate {
+        recipient: Address,
+        /// Individual milestones, each with a hash-lock and release amount.
+        milestones: Vec<Milestone>,
+        /// Unix-millisecond deadline after which the sender can reclaim unreleased funds.
+        deadline: u64,
+    },
+    /// Release a single milestone within a milestone-based escrow.
+    MilestoneRelease {
+        escrow_id: Hash,
+        /// Index of the milestone to release (0-based).
+        milestone_index: u32,
+        /// Pre-image for this milestone's hash-lock.
+        preimage: Vec<u8>,
+    },
+    /// Set spending policy for account abstraction (auto-approve rules).
+    SetSpendingPolicy {
+        /// Auto-approve transfers up to this amount (0 = disabled).
+        auto_approve_limit: Amount,
+        /// Addresses that can co-sign transactions above the auto-approve limit.
+        co_signers: Vec<Address>,
+        /// Number of co-signers required for high-value transactions (0 = disabled).
+        required_co_signers: u32,
+    },
 }
 
 /// Maximum serialized transaction size (64 KiB).
@@ -88,6 +114,19 @@ pub const MAX_ENDPOINT_LEN: usize = 256;
 pub const MAX_CAPABILITIES: usize = 16;
 /// Maximum length of a single capability tag.
 pub const MAX_CAPABILITY_LEN: usize = 64;
+/// Maximum milestones per escrow.
+pub const MAX_MILESTONES: usize = 32;
+/// Maximum co-signers per spending policy.
+pub const MAX_CO_SIGNERS: usize = 8;
+
+/// A single milestone in a milestone-based escrow.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Milestone {
+    /// Amount released when this milestone is completed.
+    pub amount: Amount,
+    /// BLAKE3 hash of the secret that proves milestone completion.
+    pub hash_lock: Hash,
+}
 
 impl Transaction {
     /// Compute the canonical hash of the signable portion (everything except signature).
@@ -197,6 +236,45 @@ impl Transaction {
                     }
                 }
             }
+            TxPayload::MilestoneEscrowCreate {
+                recipient, milestones, deadline,
+            } => {
+                if self.sender == *recipient {
+                    return Err(BaudError::SelfTransfer);
+                }
+                if milestones.is_empty() || milestones.len() > MAX_MILESTONES {
+                    return Err(BaudError::InvalidMilestoneCount {
+                        count: milestones.len(),
+                        max: MAX_MILESTONES,
+                    });
+                }
+                for m in milestones {
+                    if m.amount == 0 {
+                        return Err(BaudError::ZeroAmount);
+                    }
+                }
+                if *deadline <= self.timestamp {
+                    return Err(BaudError::EscrowDeadlineExceeded {
+                        current: self.timestamp,
+                        deadline: *deadline,
+                    });
+                }
+            }
+            TxPayload::MilestoneRelease { preimage, .. } => {
+                if preimage.len() > 1024 {
+                    return Err(BaudError::InvalidEscrowProof(
+                        "preimage too large".into(),
+                    ));
+                }
+            }
+            TxPayload::SetSpendingPolicy { co_signers, .. } => {
+                if co_signers.len() > MAX_CO_SIGNERS {
+                    return Err(BaudError::TransactionTooLarge {
+                        size: co_signers.len(),
+                        max: MAX_CO_SIGNERS,
+                    });
+                }
+            }
         }
         Ok(())
     }
@@ -270,6 +348,19 @@ pub struct Account {
     pub nonce: u64,
     /// Optional agent metadata.
     pub agent_meta: Option<AgentMeta>,
+    /// Optional spending policy for account abstraction.
+    pub spending_policy: Option<SpendingPolicy>,
+}
+
+/// Programmable spending rules for account abstraction.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpendingPolicy {
+    /// Auto-approve transfers up to this amount without co-signing.
+    pub auto_approve_limit: Amount,
+    /// Addresses authorized to co-sign high-value transactions.
+    pub co_signers: Vec<Address>,
+    /// Number of co-signers required (m-of-n).
+    pub required_co_signers: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -286,6 +377,7 @@ impl Account {
             balance: 0,
             nonce: 0,
             agent_meta: None,
+            spending_policy: None,
         }
     }
 
@@ -295,6 +387,7 @@ impl Account {
             balance,
             nonce: 0,
             agent_meta: None,
+            spending_policy: None,
         }
     }
 }
@@ -323,6 +416,31 @@ pub struct Escrow {
     pub status: EscrowStatus,
     /// Block height at which this escrow was created.
     pub created_at_height: u64,
+}
+
+/// A milestone-based escrow with multiple sub-task release stages.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MilestoneEscrow {
+    pub id: Hash,
+    pub sender: Address,
+    pub recipient: Address,
+    /// Total amount locked (sum of all milestone amounts).
+    pub total_amount: Amount,
+    /// Individual milestones with completion status.
+    pub milestones: Vec<MilestoneState>,
+    /// Amount already released across completed milestones.
+    pub released_amount: Amount,
+    pub deadline: u64,
+    pub status: EscrowStatus,
+    pub created_at_height: u64,
+}
+
+/// Runtime state of a single milestone within a milestone escrow.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MilestoneState {
+    pub amount: Amount,
+    pub hash_lock: Hash,
+    pub completed: bool,
 }
 
 // ─── Genesis ────────────────────────────────────────────────────────────────

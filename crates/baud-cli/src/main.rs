@@ -27,15 +27,15 @@ enum Commands {
 
     /// Display the address for a given secret key.
     Address {
-        /// Hex-encoded 32-byte secret key.
-        #[arg(long)]
+        /// Hex-encoded 32-byte secret key (or set BAUD_SECRET_KEY env var).
+        #[arg(long, env = "BAUD_SECRET_KEY")]
         secret: String,
     },
 
     /// Create a signed transfer transaction and print it as JSON.
     Transfer {
-        /// Hex-encoded sender secret key.
-        #[arg(long)]
+        /// Hex-encoded sender secret key (or set BAUD_SECRET_KEY env var).
+        #[arg(long, env = "BAUD_SECRET_KEY")]
         secret: String,
         /// Hex-encoded recipient address.
         #[arg(long)]
@@ -56,8 +56,8 @@ enum Commands {
 
     /// Create a signed escrow-create transaction and print it as JSON.
     EscrowCreate {
-        /// Hex-encoded sender secret key.
-        #[arg(long)]
+        /// Hex-encoded sender secret key (or set BAUD_SECRET_KEY env var).
+        #[arg(long, env = "BAUD_SECRET_KEY")]
         secret: String,
         /// Hex-encoded recipient address.
         #[arg(long)]
@@ -81,8 +81,8 @@ enum Commands {
 
     /// Create a signed escrow-release transaction and print it as JSON.
     EscrowRelease {
-        /// Hex-encoded sender (recipient of escrow) secret key.
-        #[arg(long)]
+        /// Hex-encoded sender (recipient of escrow) secret key (or set BAUD_SECRET_KEY env var).
+        #[arg(long, env = "BAUD_SECRET_KEY")]
         secret: String,
         /// Hex-encoded escrow ID.
         #[arg(long)]
@@ -100,8 +100,8 @@ enum Commands {
 
     /// Create a signed escrow-refund transaction and print it as JSON.
     EscrowRefund {
-        /// Hex-encoded sender (original escrow creator) secret key.
-        #[arg(long)]
+        /// Hex-encoded sender (original escrow creator) secret key (or set BAUD_SECRET_KEY env var).
+        #[arg(long, env = "BAUD_SECRET_KEY")]
         secret: String,
         /// Hex-encoded escrow ID.
         #[arg(long)]
@@ -116,8 +116,8 @@ enum Commands {
 
     /// Create a signed agent-register transaction and print it as JSON.
     AgentRegister {
-        /// Hex-encoded sender secret key.
-        #[arg(long)]
+        /// Hex-encoded sender secret key (or set BAUD_SECRET_KEY env var).
+        #[arg(long, env = "BAUD_SECRET_KEY")]
         secret: String,
         /// Agent name.
         #[arg(long)]

@@ -436,3 +436,216 @@ fn sign_agent_register(
     tx.signature = kp.sign(h.as_bytes());
     tx
 }
+
+// ─── Milestone Escrow Tests ─────────────────────────────────────────────
+
+fn sign_milestone_escrow_create(
+    kp: &KeyPair,
+    recipient: baud_core::crypto::Address,
+    milestones: Vec<Milestone>,
+    deadline: u64,
+    nonce: u64,
+) -> Transaction {
+    let mut tx = Transaction {
+        sender: kp.address(),
+        nonce,
+        payload: TxPayload::MilestoneEscrowCreate {
+            recipient,
+            milestones,
+            deadline,
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = tx.signable_hash();
+    tx.signature = kp.sign(h.as_bytes());
+    tx
+}
+
+fn sign_milestone_release(
+    kp: &KeyPair,
+    escrow_id: Hash,
+    milestone_index: u32,
+    preimage: &[u8],
+    nonce: u64,
+) -> Transaction {
+    let mut tx = Transaction {
+        sender: kp.address(),
+        nonce,
+        payload: TxPayload::MilestoneRelease {
+            escrow_id,
+            milestone_index,
+            preimage: preimage.to_vec(),
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = tx.signable_hash();
+    tx.signature = kp.sign(h.as_bytes());
+    tx
+}
+
+/// Milestone escrow: create with 3 milestones, release them one by one.
+#[test]
+fn milestone_escrow_lifecycle() {
+    let alice = KeyPair::generate();
+    let bob = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state
+        .accounts
+        .insert(alice.address(), Account::with_balance(alice.address(), 10_000));
+
+    let secret1 = b"milestone_secret_1";
+    let secret2 = b"milestone_secret_2";
+    let secret3 = b"milestone_secret_3";
+
+    let milestones = vec![
+        Milestone { amount: 1000, hash_lock: Hash::digest(secret1) },
+        Milestone { amount: 2000, hash_lock: Hash::digest(secret2) },
+        Milestone { amount: 3000, hash_lock: Hash::digest(secret3) },
+    ];
+
+    let create_tx = sign_milestone_escrow_create(
+        &alice, bob.address(), milestones, 5_000_000, 0,
+    );
+    state.validate_transaction(&create_tx, 1_000_000).unwrap();
+    state.apply_transaction(&create_tx).unwrap();
+
+    // 6000 locked, 4000 remaining
+    assert_eq!(state.balance_of(&alice.address()), 4_000);
+
+    let escrow_id = create_tx.hash();
+
+    // Release milestone 0
+    let release0 = sign_milestone_release(&bob, escrow_id, 0, secret1, 0);
+    state.validate_transaction(&release0, 1_500_000).unwrap();
+    state.apply_transaction(&release0).unwrap();
+    assert_eq!(state.balance_of(&bob.address()), 1_000);
+
+    // Release milestone 2 (out of order is fine)
+    let release2 = sign_milestone_release(&bob, escrow_id, 2, secret3, 1);
+    state.validate_transaction(&release2, 2_000_000).unwrap();
+    state.apply_transaction(&release2).unwrap();
+    assert_eq!(state.balance_of(&bob.address()), 4_000);
+
+    // Escrow still active (milestone 1 not done)
+    assert_eq!(
+        state.milestone_escrows.get(&escrow_id).unwrap().status,
+        EscrowStatus::Active,
+    );
+
+    // Release final milestone
+    let release1 = sign_milestone_release(&bob, escrow_id, 1, secret2, 2);
+    state.validate_transaction(&release1, 2_500_000).unwrap();
+    state.apply_transaction(&release1).unwrap();
+    assert_eq!(state.balance_of(&bob.address()), 6_000);
+
+    // Now fully released
+    assert_eq!(
+        state.milestone_escrows.get(&escrow_id).unwrap().status,
+        EscrowStatus::Released,
+    );
+}
+
+/// Milestone release with wrong preimage should fail.
+#[test]
+fn milestone_wrong_preimage_fails() {
+    let alice = KeyPair::generate();
+    let bob = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state
+        .accounts
+        .insert(alice.address(), Account::with_balance(alice.address(), 5_000));
+
+    let secret = b"real_secret";
+    let milestones = vec![
+        Milestone { amount: 1000, hash_lock: Hash::digest(secret) },
+    ];
+    let create_tx = sign_milestone_escrow_create(
+        &alice, bob.address(), milestones, 5_000_000, 0,
+    );
+    state.apply_transaction(&create_tx).unwrap();
+
+    let escrow_id = create_tx.hash();
+    let bad_release = sign_milestone_release(&bob, escrow_id, 0, b"wrong_secret", 0);
+    let result = state.validate_transaction(&bad_release, 1_500_000);
+    assert!(result.is_err());
+    assert!(format!("{}", result.unwrap_err()).contains("preimage"));
+}
+
+/// Duplicate milestone release should fail.
+#[test]
+fn milestone_double_release_fails() {
+    let alice = KeyPair::generate();
+    let bob = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state
+        .accounts
+        .insert(alice.address(), Account::with_balance(alice.address(), 5_000));
+
+    let secret = b"my_secret";
+    let milestones = vec![
+        Milestone { amount: 1000, hash_lock: Hash::digest(secret) },
+        Milestone { amount: 2000, hash_lock: Hash::digest(b"other") },
+    ];
+    let create_tx = sign_milestone_escrow_create(
+        &alice, bob.address(), milestones, 5_000_000, 0,
+    );
+    state.apply_transaction(&create_tx).unwrap();
+
+    let escrow_id = create_tx.hash();
+
+    // First release succeeds
+    let release = sign_milestone_release(&bob, escrow_id, 0, secret, 0);
+    state.validate_transaction(&release, 1_500_000).unwrap();
+    state.apply_transaction(&release).unwrap();
+
+    // Second release of same milestone fails
+    let dup_release = sign_milestone_release(&bob, escrow_id, 0, secret, 1);
+    let result = state.validate_transaction(&dup_release, 1_500_000);
+    assert!(result.is_err());
+    assert!(format!("{}", result.unwrap_err()).contains("already completed"));
+}
+
+// ─── Spending Policy Tests ──────────────────────────────────────────────
+
+/// Setting and verifying spending policy.
+#[test]
+fn spending_policy_set() {
+    let alice = KeyPair::generate();
+    let cosigner = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state
+        .accounts
+        .insert(alice.address(), Account::with_balance(alice.address(), 10_000));
+
+    let mut tx = Transaction {
+        sender: alice.address(),
+        nonce: 0,
+        payload: TxPayload::SetSpendingPolicy {
+            auto_approve_limit: 500,
+            co_signers: vec![cosigner.address()],
+            required_co_signers: 1,
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = tx.signable_hash();
+    tx.signature = alice.sign(h.as_bytes());
+
+    state.validate_transaction(&tx, 1_000_000).unwrap();
+    state.apply_transaction(&tx).unwrap();
+
+    let acc = state.get_account(&alice.address());
+    let policy = acc.spending_policy.unwrap();
+    assert_eq!(policy.auto_approve_limit, 500);
+    assert_eq!(policy.co_signers.len(), 1);
+    assert_eq!(policy.required_co_signers, 1);
+}
