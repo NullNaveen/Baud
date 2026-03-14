@@ -115,7 +115,11 @@ impl ConsensusEngine {
         state: Arc<RwLock<WorldState>>,
         mempool: Arc<Mempool>,
         config: ConsensusConfig,
-    ) -> (Self, broadcast::Receiver<FinalizedBlock>, mpsc::Sender<ConsensusMessage>) {
+    ) -> (
+        Self,
+        broadcast::Receiver<FinalizedBlock>,
+        mpsc::Sender<ConsensusMessage>,
+    ) {
         let (finalized_tx, finalized_rx) = broadcast::channel(256);
         let (consensus_tx, consensus_rx) = mpsc::channel(1024);
 
@@ -292,8 +296,12 @@ impl ConsensusEngine {
 
         // Verify proposer signature.
         let header_hash = block.header.signable_hash();
-        if verify_signature(&block.header.proposer, header_hash.as_bytes(), &block.header.signature)
-            .is_err()
+        if verify_signature(
+            &block.header.proposer,
+            header_hash.as_bytes(),
+            &block.header.signature,
+        )
+        .is_err()
         {
             warn!("invalid proposer signature");
             return false;
@@ -434,7 +442,10 @@ impl ConsensusEngine {
 
     /// Run the consensus loop. This is the main entry point for the engine.
     pub async fn run(self: Arc<Self>, mut shutdown: broadcast::Receiver<()>) {
-        let mut rx = self.consensus_rx.write().take()
+        let mut rx = self
+            .consensus_rx
+            .write()
+            .take()
             .expect("consensus_rx already taken — engine can only be run once");
 
         let block_interval = Duration::from_millis(self.config.block_interval_ms);
@@ -586,19 +597,15 @@ mod tests {
         let addr = kp.address();
 
         let mut state = WorldState::new("test-chain".into());
-        state.accounts.insert(addr, Account::with_balance(addr, 1_000_000));
+        state
+            .accounts
+            .insert(addr, Account::with_balance(addr, 1_000_000));
 
         let state = Arc::new(RwLock::new(state));
         let mempool = Arc::new(Mempool::new());
         let config = ConsensusConfig::default();
 
-        let (engine, rx, _tx) = ConsensusEngine::new(
-            kp,
-            vec![addr],
-            state,
-            mempool,
-            config,
-        );
+        let (engine, rx, _tx) = ConsensusEngine::new(kp, vec![addr], state, mempool, config);
 
         (Arc::new(engine), rx)
     }

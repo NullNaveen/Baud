@@ -27,12 +27,10 @@ fn full_lifecycle() {
                 balance: 1_000 * QUANTA_PER_BAUD,
             },
         ],
-        validators: vec![
-            ValidatorInfo {
-                address: alice.address(),
-                name: "alice".into(),
-            },
-        ],
+        validators: vec![ValidatorInfo {
+            address: alice.address(),
+            name: "alice".into(),
+        }],
         timestamp: 1_000_000,
     };
 
@@ -40,30 +38,20 @@ fn full_lifecycle() {
     let _mempool = Mempool::new();
 
     // Verify genesis balances.
-    assert_eq!(
-        state.balance_of(&alice.address()),
-        10_000 * QUANTA_PER_BAUD
-    );
-    assert_eq!(
-        state.balance_of(&bob.address()),
-        5_000 * QUANTA_PER_BAUD
-    );
+    assert_eq!(state.balance_of(&alice.address()), 10_000 * QUANTA_PER_BAUD);
+    assert_eq!(state.balance_of(&bob.address()), 5_000 * QUANTA_PER_BAUD);
 
     // ── Transfer: Alice → Bob ───────────────────────────────────────────
     let tx1 = sign_transfer(&alice, bob.address(), 100 * QUANTA_PER_BAUD, 0);
     state
         .validate_transaction(&tx1, 1_000_000)
         .expect("transfer should validate");
-    state.apply_transaction(&tx1).expect("transfer should apply");
+    state
+        .apply_transaction(&tx1)
+        .expect("transfer should apply");
 
-    assert_eq!(
-        state.balance_of(&alice.address()),
-        9_900 * QUANTA_PER_BAUD
-    );
-    assert_eq!(
-        state.balance_of(&bob.address()),
-        5_100 * QUANTA_PER_BAUD
-    );
+    assert_eq!(state.balance_of(&alice.address()), 9_900 * QUANTA_PER_BAUD);
+    assert_eq!(state.balance_of(&bob.address()), 5_100 * QUANTA_PER_BAUD);
 
     // ── Micro-transaction: Bob → Charlie (0.001 BAUD) ───────────────────
     let micro_amount = QUANTA_PER_BAUD / 1000; // 0.001 BAUD
@@ -94,17 +82,11 @@ fn full_lifecycle() {
     state.apply_transaction(&escrow_tx).unwrap();
 
     // Alice's balance should be reduced by escrow amount.
-    assert_eq!(
-        state.balance_of(&alice.address()),
-        9_400 * QUANTA_PER_BAUD
-    );
+    assert_eq!(state.balance_of(&alice.address()), 9_400 * QUANTA_PER_BAUD);
 
     let escrow_id = escrow_tx.hash();
     assert!(state.escrows.contains_key(&escrow_id));
-    assert_eq!(
-        state.escrows[&escrow_id].status,
-        EscrowStatus::Active
-    );
+    assert_eq!(state.escrows[&escrow_id].status, EscrowStatus::Active);
 
     // ── Escrow release: Charlie reveals preimage ────────────────────────
     let release_tx = sign_escrow_release(&charlie, escrow_id, secret, 0);
@@ -115,10 +97,7 @@ fn full_lifecycle() {
         state.balance_of(&charlie.address()),
         1_500 * QUANTA_PER_BAUD + micro_amount
     );
-    assert_eq!(
-        state.escrows[&escrow_id].status,
-        EscrowStatus::Released
-    );
+    assert_eq!(state.escrows[&escrow_id].status, EscrowStatus::Released);
 
     // ── Agent registration ──────────────────────────────────────────────
     let register_tx = sign_agent_register(
@@ -196,8 +175,7 @@ fn escrow_refund_before_deadline_fails() {
 
     let hash_lock = Hash::digest(b"secret");
     let deadline = 5_000_000u64;
-    let escrow_tx =
-        sign_escrow_create(&alice, bob.address(), 5_000, hash_lock, deadline, 0);
+    let escrow_tx = sign_escrow_create(&alice, bob.address(), 5_000, hash_lock, deadline, 0);
     state.apply_transaction(&escrow_tx).unwrap();
 
     let escrow_id = escrow_tx.hash();
@@ -224,8 +202,7 @@ fn escrow_wrong_preimage_fails() {
     let real_secret = b"correct_secret";
     let hash_lock = Hash::digest(real_secret);
     let deadline = 5_000_000u64;
-    let escrow_tx =
-        sign_escrow_create(&alice, bob.address(), 5_000, hash_lock, deadline, 0);
+    let escrow_tx = sign_escrow_create(&alice, bob.address(), 5_000, hash_lock, deadline, 0);
     state.apply_transaction(&escrow_tx).unwrap();
 
     let escrow_id = escrow_tx.hash();
@@ -253,8 +230,7 @@ fn escrow_unauthorized_release() {
     let secret = b"secret";
     let hash_lock = Hash::digest(secret);
     let deadline = 5_000_000u64;
-    let escrow_tx =
-        sign_escrow_create(&alice, bob.address(), 5_000, hash_lock, deadline, 0);
+    let escrow_tx = sign_escrow_create(&alice, bob.address(), 5_000, hash_lock, deadline, 0);
     state.apply_transaction(&escrow_tx).unwrap();
 
     let escrow_id = escrow_tx.hash();
@@ -275,12 +251,7 @@ fn mempool_integration() {
     // Add 50 transactions.
     let mut hashes = Vec::new();
     for i in 0..50u64 {
-        let tx = sign_transfer(
-            &agent,
-            KeyPair::generate().address(),
-            1,
-            i,
-        );
+        let tx = sign_transfer(&agent, KeyPair::generate().address(), 1, i);
         let h = pool.add(tx).unwrap();
         hashes.push(h);
     }
@@ -321,12 +292,7 @@ fn balance_overflow_protection() {
 
 // ─── Helper functions ───────────────────────────────────────────────────────
 
-fn sign_transfer(
-    kp: &KeyPair,
-    to: baud_core::Address,
-    amount: u128,
-    nonce: u64,
-) -> Transaction {
+fn sign_transfer(kp: &KeyPair, to: baud_core::Address, amount: u128, nonce: u64) -> Transaction {
     let mut tx = Transaction {
         sender: kp.address(),
         nonce,
@@ -370,12 +336,7 @@ fn sign_escrow_create(
     tx
 }
 
-fn sign_escrow_release(
-    kp: &KeyPair,
-    escrow_id: Hash,
-    preimage: &[u8],
-    nonce: u64,
-) -> Transaction {
+fn sign_escrow_release(kp: &KeyPair, escrow_id: Hash, preimage: &[u8], nonce: u64) -> Transaction {
     let mut tx = Transaction {
         sender: kp.address(),
         nonce,
@@ -392,11 +353,7 @@ fn sign_escrow_release(
     tx
 }
 
-fn sign_escrow_refund(
-    kp: &KeyPair,
-    escrow_id: Hash,
-    nonce: u64,
-) -> Transaction {
+fn sign_escrow_refund(kp: &KeyPair, escrow_id: Hash, nonce: u64) -> Transaction {
     let mut tx = Transaction {
         sender: kp.address(),
         nonce,
@@ -423,10 +380,7 @@ fn sign_agent_register(
         payload: TxPayload::AgentRegister {
             name: name.as_bytes().to_vec(),
             endpoint: endpoint.as_bytes().to_vec(),
-            capabilities: capabilities
-                .iter()
-                .map(|c| c.as_bytes().to_vec())
-                .collect(),
+            capabilities: capabilities.iter().map(|c| c.as_bytes().to_vec()).collect(),
         },
         timestamp: 1_000_000,
         chain_id: "baud-test".into(),
@@ -494,23 +448,31 @@ fn milestone_escrow_lifecycle() {
     let bob = KeyPair::generate();
 
     let mut state = WorldState::new("baud-test".into());
-    state
-        .accounts
-        .insert(alice.address(), Account::with_balance(alice.address(), 10_000));
+    state.accounts.insert(
+        alice.address(),
+        Account::with_balance(alice.address(), 10_000),
+    );
 
     let secret1 = b"milestone_secret_1";
     let secret2 = b"milestone_secret_2";
     let secret3 = b"milestone_secret_3";
 
     let milestones = vec![
-        Milestone { amount: 1000, hash_lock: Hash::digest(secret1) },
-        Milestone { amount: 2000, hash_lock: Hash::digest(secret2) },
-        Milestone { amount: 3000, hash_lock: Hash::digest(secret3) },
+        Milestone {
+            amount: 1000,
+            hash_lock: Hash::digest(secret1),
+        },
+        Milestone {
+            amount: 2000,
+            hash_lock: Hash::digest(secret2),
+        },
+        Milestone {
+            amount: 3000,
+            hash_lock: Hash::digest(secret3),
+        },
     ];
 
-    let create_tx = sign_milestone_escrow_create(
-        &alice, bob.address(), milestones, 5_000_000, 0,
-    );
+    let create_tx = sign_milestone_escrow_create(&alice, bob.address(), milestones, 5_000_000, 0);
     state.validate_transaction(&create_tx, 1_000_000).unwrap();
     state.apply_transaction(&create_tx).unwrap();
 
@@ -557,17 +519,17 @@ fn milestone_wrong_preimage_fails() {
     let bob = KeyPair::generate();
 
     let mut state = WorldState::new("baud-test".into());
-    state
-        .accounts
-        .insert(alice.address(), Account::with_balance(alice.address(), 5_000));
+    state.accounts.insert(
+        alice.address(),
+        Account::with_balance(alice.address(), 5_000),
+    );
 
     let secret = b"real_secret";
-    let milestones = vec![
-        Milestone { amount: 1000, hash_lock: Hash::digest(secret) },
-    ];
-    let create_tx = sign_milestone_escrow_create(
-        &alice, bob.address(), milestones, 5_000_000, 0,
-    );
+    let milestones = vec![Milestone {
+        amount: 1000,
+        hash_lock: Hash::digest(secret),
+    }];
+    let create_tx = sign_milestone_escrow_create(&alice, bob.address(), milestones, 5_000_000, 0);
     state.apply_transaction(&create_tx).unwrap();
 
     let escrow_id = create_tx.hash();
@@ -584,18 +546,23 @@ fn milestone_double_release_fails() {
     let bob = KeyPair::generate();
 
     let mut state = WorldState::new("baud-test".into());
-    state
-        .accounts
-        .insert(alice.address(), Account::with_balance(alice.address(), 5_000));
+    state.accounts.insert(
+        alice.address(),
+        Account::with_balance(alice.address(), 5_000),
+    );
 
     let secret = b"my_secret";
     let milestones = vec![
-        Milestone { amount: 1000, hash_lock: Hash::digest(secret) },
-        Milestone { amount: 2000, hash_lock: Hash::digest(b"other") },
+        Milestone {
+            amount: 1000,
+            hash_lock: Hash::digest(secret),
+        },
+        Milestone {
+            amount: 2000,
+            hash_lock: Hash::digest(b"other"),
+        },
     ];
-    let create_tx = sign_milestone_escrow_create(
-        &alice, bob.address(), milestones, 5_000_000, 0,
-    );
+    let create_tx = sign_milestone_escrow_create(&alice, bob.address(), milestones, 5_000_000, 0);
     state.apply_transaction(&create_tx).unwrap();
 
     let escrow_id = create_tx.hash();
@@ -621,9 +588,10 @@ fn spending_policy_set() {
     let cosigner = KeyPair::generate();
 
     let mut state = WorldState::new("baud-test".into());
-    state
-        .accounts
-        .insert(alice.address(), Account::with_balance(alice.address(), 10_000));
+    state.accounts.insert(
+        alice.address(),
+        Account::with_balance(alice.address(), 10_000),
+    );
 
     let mut tx = Transaction {
         sender: alice.address(),

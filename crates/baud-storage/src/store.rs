@@ -24,8 +24,8 @@ impl BaudStore {
 
     /// Save the full world state to disk.
     pub fn save_state(&self, state: &WorldState) -> Result<(), StoreError> {
-        let encoded = bincode::serialize(state)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
+        let encoded =
+            bincode::serialize(state).map_err(|e| StoreError::Serialization(e.to_string()))?;
 
         self.db
             .insert(STATE_KEY, encoded.as_slice())
@@ -35,19 +35,33 @@ impl BaudStore {
             .insert(META_KEY_HEIGHT, &state.height.to_le_bytes())
             .map_err(|e| StoreError::Storage(e.to_string()))?;
 
-        self.db.flush().map_err(|e| StoreError::Storage(e.to_string()))?;
+        self.db
+            .flush()
+            .map_err(|e| StoreError::Storage(e.to_string()))?;
 
-        debug!(height = state.height, bytes = encoded.len(), "state persisted");
+        debug!(
+            height = state.height,
+            bytes = encoded.len(),
+            "state persisted"
+        );
         Ok(())
     }
 
     /// Load the world state from disk. Returns None if no state has been saved.
     pub fn load_state(&self) -> Result<Option<WorldState>, StoreError> {
-        match self.db.get(STATE_KEY).map_err(|e| StoreError::Storage(e.to_string()))? {
+        match self
+            .db
+            .get(STATE_KEY)
+            .map_err(|e| StoreError::Storage(e.to_string()))?
+        {
             Some(bytes) => {
                 let state: WorldState = bincode::deserialize(&bytes)
                     .map_err(|e| StoreError::Serialization(e.to_string()))?;
-                info!(height = state.height, accounts = state.accounts.len(), "state loaded from disk");
+                info!(
+                    height = state.height,
+                    accounts = state.accounts.len(),
+                    "state loaded from disk"
+                );
                 Ok(Some(state))
             }
             None => Ok(None),
@@ -56,7 +70,11 @@ impl BaudStore {
 
     /// Get the persisted block height without deserializing the full state.
     pub fn persisted_height(&self) -> Result<Option<u64>, StoreError> {
-        match self.db.get(META_KEY_HEIGHT).map_err(|e| StoreError::Storage(e.to_string()))? {
+        match self
+            .db
+            .get(META_KEY_HEIGHT)
+            .map_err(|e| StoreError::Storage(e.to_string()))?
+        {
             Some(bytes) => {
                 if bytes.len() == 8 {
                     let arr: [u8; 8] = bytes.as_ref().try_into().unwrap();
@@ -71,7 +89,9 @@ impl BaudStore {
 
     /// Flush all pending writes to disk.
     pub fn flush(&self) -> Result<(), StoreError> {
-        self.db.flush().map_err(|e| StoreError::Storage(e.to_string()))?;
+        self.db
+            .flush()
+            .map_err(|e| StoreError::Storage(e.to_string()))?;
         Ok(())
     }
 }

@@ -182,10 +182,7 @@ impl RateLimiter {
     /// Returns `true` if allowed, `false` if rate-limited.
     fn try_acquire(&self, ip: IpAddr) -> bool {
         let now = Instant::now();
-        let mut entry = self
-            .buckets
-            .entry(ip)
-            .or_insert((self.max_tokens, now));
+        let mut entry = self.buckets.entry(ip).or_insert((self.max_tokens, now));
 
         let (tokens, last_refill) = entry.value_mut();
         let elapsed = now.duration_since(*last_refill).as_secs_f64();
@@ -255,7 +252,10 @@ pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Ro
         .route("/v1/health", get(get_health))
         .route("/v1/metrics", get(get_metrics))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
-        .layer(middleware::from_fn_with_state(limiter, rate_limit_middleware))
+        .layer(middleware::from_fn_with_state(
+            limiter,
+            rate_limit_middleware,
+        ))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -322,9 +322,8 @@ async fn submit_tx(
     Json(req): Json<SubmitTxRequest>,
 ) -> Result<(StatusCode, Json<SubmitTxResponse>), (StatusCode, Json<ErrorResponse>)> {
     // Parse the request into a Transaction.
-    let tx = parse_tx_request(req).map_err(|e| {
+    let tx = parse_tx_request(req).inspect_err(|_e| {
         state.tx_rejected.fetch_add(1, Ordering::Relaxed);
-        e
     })?;
 
     // Validate structure.

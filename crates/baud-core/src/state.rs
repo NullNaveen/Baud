@@ -9,8 +9,8 @@ const MAX_ESCROWS_PER_ACCOUNT: usize = 1000;
 use crate::crypto::{verify_signature, Address, Hash};
 use crate::error::{BaudError, BaudResult};
 use crate::types::{
-    Account, AgentMeta, Amount, Escrow, EscrowStatus, MilestoneEscrow,
-    MilestoneState, SpendingPolicy, Transaction, TxPayload,
+    Account, AgentMeta, Amount, Escrow, EscrowStatus, MilestoneEscrow, MilestoneState,
+    SpendingPolicy, Transaction, TxPayload,
 };
 
 // ─── World State ────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ impl WorldState {
         for alloc in &config.allocations {
             total_allocated = total_allocated
                 .checked_add(alloc.balance)
-                .ok_or_else(|| BaudError::GenesisOverflow)?;
+                .ok_or(BaudError::GenesisOverflow)?;
             let account = Account::with_balance(alloc.address, alloc.balance);
             state.accounts.insert(alloc.address, account);
         }
@@ -83,10 +83,7 @@ impl WorldState {
 
     /// Get account balance.
     pub fn balance_of(&self, address: &Address) -> Amount {
-        self.accounts
-            .get(address)
-            .map(|a| a.balance)
-            .unwrap_or(0)
+        self.accounts.get(address).map(|a| a.balance).unwrap_or(0)
     }
 
     /// Compute the state root: BLAKE3 hash of the deterministic serialization
@@ -95,8 +92,7 @@ impl WorldState {
         let mut sorted: Vec<_> = self.accounts.iter().collect();
         sorted.sort_by_key(|(addr, _)| addr.0);
 
-        let bytes = bincode::serialize(&sorted)
-            .expect("state serialization should never fail");
+        let bytes = bincode::serialize(&sorted).expect("state serialization should never fail");
         Hash::digest(&bytes)
     }
 
@@ -104,11 +100,7 @@ impl WorldState {
 
     /// Fully validate a transaction against the current state.
     /// This checks: structure, signature, nonce, balance, and payload-specific rules.
-    pub fn validate_transaction(
-        &self,
-        tx: &Transaction,
-        current_time: u64,
-    ) -> BaudResult<()> {
+    pub fn validate_transaction(&self, tx: &Transaction, current_time: u64) -> BaudResult<()> {
         // 1. Structural validation
         tx.validate_structure()?;
 
@@ -174,15 +166,16 @@ impl WorldState {
                     }
                 }
             }
-            TxPayload::EscrowRelease { escrow_id, preimage } => {
+            TxPayload::EscrowRelease {
+                escrow_id,
+                preimage,
+            } => {
                 let escrow = self
                     .escrows
                     .get(escrow_id)
                     .ok_or_else(|| BaudError::EscrowNotFound(escrow_id.to_hex()))?;
                 if escrow.status != EscrowStatus::Active {
-                    return Err(BaudError::EscrowAlreadyFinalized(
-                        escrow_id.to_hex(),
-                    ));
+                    return Err(BaudError::EscrowAlreadyFinalized(escrow_id.to_hex()));
                 }
                 // Only the recipient can release.
                 if tx.sender != escrow.recipient {
@@ -211,9 +204,7 @@ impl WorldState {
                     .get(escrow_id)
                     .ok_or_else(|| BaudError::EscrowNotFound(escrow_id.to_hex()))?;
                 if escrow.status != EscrowStatus::Active {
-                    return Err(BaudError::EscrowAlreadyFinalized(
-                        escrow_id.to_hex(),
-                    ));
+                    return Err(BaudError::EscrowAlreadyFinalized(escrow_id.to_hex()));
                 }
                 // Only the sender can refund.
                 if tx.sender != escrow.sender {
@@ -245,7 +236,11 @@ impl WorldState {
                     });
                 }
             }
-            TxPayload::MilestoneRelease { escrow_id, milestone_index, preimage } => {
+            TxPayload::MilestoneRelease {
+                escrow_id,
+                milestone_index,
+                preimage,
+            } => {
                 let escrow = self
                     .milestone_escrows
                     .get(escrow_id)
@@ -304,10 +299,7 @@ impl WorldState {
                 .accounts
                 .entry(sender_addr)
                 .or_insert_with(|| Account::new(sender_addr));
-            sender.nonce = sender
-                .nonce
-                .checked_add(1)
-                .ok_or(BaudError::Overflow)?;
+            sender.nonce = sender.nonce.checked_add(1).ok_or(BaudError::Overflow)?;
         }
 
         match &tx.payload {
@@ -315,13 +307,12 @@ impl WorldState {
                 // Debit sender (checked).
                 {
                     let sender = self.accounts.get_mut(&sender_addr).unwrap();
-                    sender.balance = sender
-                        .balance
-                        .checked_sub(*amount)
-                        .ok_or(BaudError::InsufficientBalance {
+                    sender.balance = sender.balance.checked_sub(*amount).ok_or(
+                        BaudError::InsufficientBalance {
                             have: sender.balance,
                             need: *amount,
-                        })?;
+                        },
+                    )?;
                 }
                 // Credit recipient (checked).
                 {
@@ -349,21 +340,30 @@ impl WorldState {
                 deadline,
             } => {
                 // Enforce per-account escrow limit.
-                let sender_escrow_count = self.escrows.values().filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active).count()
-                    + self.milestone_escrows.values().filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active).count();
+                let sender_escrow_count = self
+                    .escrows
+                    .values()
+                    .filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active)
+                    .count()
+                    + self
+                        .milestone_escrows
+                        .values()
+                        .filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active)
+                        .count();
                 if sender_escrow_count >= MAX_ESCROWS_PER_ACCOUNT {
-                    return Err(BaudError::TooManyEscrows { max: MAX_ESCROWS_PER_ACCOUNT });
+                    return Err(BaudError::TooManyEscrows {
+                        max: MAX_ESCROWS_PER_ACCOUNT,
+                    });
                 }
                 // Debit sender.
                 {
                     let sender = self.accounts.get_mut(&sender_addr).unwrap();
-                    sender.balance = sender
-                        .balance
-                        .checked_sub(*amount)
-                        .ok_or(BaudError::InsufficientBalance {
+                    sender.balance = sender.balance.checked_sub(*amount).ok_or(
+                        BaudError::InsufficientBalance {
                             have: sender.balance,
                             need: *amount,
-                        })?;
+                        },
+                    )?;
                 }
                 // Create escrow entry.
                 let escrow_id = tx.hash();
@@ -396,10 +396,7 @@ impl WorldState {
                     .accounts
                     .entry(recipient)
                     .or_insert_with(|| Account::new(recipient));
-                rec.balance = rec
-                    .balance
-                    .checked_add(amount)
-                    .ok_or(BaudError::Overflow)?;
+                rec.balance = rec.balance.checked_add(amount).ok_or(BaudError::Overflow)?;
                 debug!(escrow_id = %escrow_id, "escrow released");
             }
 
@@ -414,10 +411,7 @@ impl WorldState {
                     .accounts
                     .entry(sender)
                     .or_insert_with(|| Account::new(sender));
-                acc.balance = acc
-                    .balance
-                    .checked_add(amount)
-                    .ok_or(BaudError::Overflow)?;
+                acc.balance = acc.balance.checked_add(amount).ok_or(BaudError::Overflow)?;
                 debug!(escrow_id = %escrow_id, "escrow refunded");
             }
 
@@ -441,10 +435,20 @@ impl WorldState {
                 deadline,
             } => {
                 // Enforce per-account escrow limit.
-                let sender_escrow_count = self.escrows.values().filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active).count()
-                    + self.milestone_escrows.values().filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active).count();
+                let sender_escrow_count = self
+                    .escrows
+                    .values()
+                    .filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active)
+                    .count()
+                    + self
+                        .milestone_escrows
+                        .values()
+                        .filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active)
+                        .count();
                 if sender_escrow_count >= MAX_ESCROWS_PER_ACCOUNT {
-                    return Err(BaudError::TooManyEscrows { max: MAX_ESCROWS_PER_ACCOUNT });
+                    return Err(BaudError::TooManyEscrows {
+                        max: MAX_ESCROWS_PER_ACCOUNT,
+                    });
                 }
                 // Sum total and debit sender.
                 let total: Amount = milestones
@@ -453,13 +457,12 @@ impl WorldState {
                     .ok_or(BaudError::Overflow)?;
                 {
                     let sender = self.accounts.get_mut(&sender_addr).unwrap();
-                    sender.balance = sender
-                        .balance
-                        .checked_sub(total)
-                        .ok_or(BaudError::InsufficientBalance {
+                    sender.balance = sender.balance.checked_sub(total).ok_or(
+                        BaudError::InsufficientBalance {
                             have: sender.balance,
                             need: total,
-                        })?;
+                        },
+                    )?;
                 }
                 let escrow_id = tx.hash();
                 let milestone_states: Vec<MilestoneState> = milestones
@@ -510,10 +513,7 @@ impl WorldState {
                     .accounts
                     .entry(recipient)
                     .or_insert_with(|| Account::new(recipient));
-                rec.balance = rec
-                    .balance
-                    .checked_add(amount)
-                    .ok_or(BaudError::Overflow)?;
+                rec.balance = rec.balance.checked_add(amount).ok_or(BaudError::Overflow)?;
                 debug!(escrow_id = %escrow_id, milestone = idx, amount = %amount, "milestone released");
             }
 
@@ -585,12 +585,7 @@ mod tests {
     use super::*;
     use crate::crypto::KeyPair;
 
-    fn make_transfer(
-        kp: &KeyPair,
-        to: Address,
-        amount: Amount,
-        nonce: u64,
-    ) -> Transaction {
+    fn make_transfer(kp: &KeyPair, to: Address, amount: Amount, nonce: u64) -> Transaction {
         let payload = TxPayload::Transfer {
             to,
             amount,
@@ -616,9 +611,10 @@ mod tests {
         let bob = KeyPair::generate();
 
         let mut state = WorldState::new("test".into());
-        state
-            .accounts
-            .insert(alice.address(), Account::with_balance(alice.address(), 1000));
+        state.accounts.insert(
+            alice.address(),
+            Account::with_balance(alice.address(), 1000),
+        );
 
         let tx = make_transfer(&alice, bob.address(), 100, 0);
         state
@@ -651,9 +647,10 @@ mod tests {
         let bob = KeyPair::generate();
 
         let mut state = WorldState::new("test".into());
-        state
-            .accounts
-            .insert(alice.address(), Account::with_balance(alice.address(), 1000));
+        state.accounts.insert(
+            alice.address(),
+            Account::with_balance(alice.address(), 1000),
+        );
 
         let tx = make_transfer(&alice, bob.address(), 100, 5);
         let result = state.validate_transaction(&tx, 1_000_000);

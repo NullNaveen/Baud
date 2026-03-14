@@ -42,7 +42,7 @@ impl Default for NetworkConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NetworkMessage {
     /// A consensus-layer message to forward.
-    Consensus(ConsensusMessage),
+    Consensus(Box<ConsensusMessage>),
     /// Request a peer's current chain height.
     PingHeight,
     /// Response with current height.
@@ -161,7 +161,12 @@ impl NetworkNode {
         };
 
         info!(peer = %addr, "inbound peer connected");
-        self.peers.insert(addr.clone(), PeerInfo { _address: addr.clone() });
+        self.peers.insert(
+            addr.clone(),
+            PeerInfo {
+                _address: addr.clone(),
+            },
+        );
 
         let (mut write, mut read) = ws.split();
 
@@ -195,7 +200,7 @@ impl NetworkNode {
                 }
                 // Outbound: us → peer
                 Ok(text) = outbound_rx.recv() => {
-                    if write.send(Message::Text(text.into())).await.is_err() {
+                    if write.send(Message::Text(text)).await.is_err() {
                         break;
                     }
                 }
@@ -216,7 +221,12 @@ impl NetworkNode {
         match connect_async(&ws_url).await {
             Ok((ws, _)) => {
                 info!(peer = %addr, "connected to peer");
-                self.peers.insert(addr.to_string(), PeerInfo { _address: addr.to_string() });
+                self.peers.insert(
+                    addr.to_string(),
+                    PeerInfo {
+                        _address: addr.to_string(),
+                    },
+                );
 
                 let (mut write, mut read) = ws.split();
                 let mut outbound_rx = self.outbound_tx.subscribe();
@@ -245,7 +255,7 @@ impl NetworkNode {
                             }
                         }
                         Ok(text) = outbound_rx.recv() => {
-                            if write.send(Message::Text(text.into())).await.is_err() {
+                            if write.send(Message::Text(text)).await.is_err() {
                                 break;
                             }
                         }
@@ -293,7 +303,7 @@ impl NetworkNode {
 
         match msg {
             NetworkMessage::Consensus(consensus_msg) => {
-                if self.to_consensus.send(consensus_msg).await.is_err() {
+                if self.to_consensus.send(*consensus_msg).await.is_err() {
                     warn!("consensus channel closed");
                 }
             }
@@ -315,11 +325,14 @@ impl NetworkNode {
 
     /// Forward outbound consensus messages to all peers.
     async fn forward_outbound(self: Arc<Self>) {
-        let mut rx = self.from_consensus.write().take()
+        let mut rx = self
+            .from_consensus
+            .write()
+            .take()
             .expect("from_consensus already taken");
 
         while let Some(msg) = rx.recv().await {
-            let network_msg = NetworkMessage::Consensus(msg);
+            let network_msg = NetworkMessage::Consensus(Box::new(msg));
             match serde_json::to_string(&network_msg) {
                 Ok(text) => {
                     let _ = self.outbound_tx.send(text);

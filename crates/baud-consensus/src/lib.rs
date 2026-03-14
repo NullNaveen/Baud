@@ -1,3 +1,3 @@
 pub mod engine;
 
-pub use engine::{ConsensusEngine, ConsensusConfig, ConsensusMessage, Vote};
+pub use engine::{ConsensusConfig, ConsensusEngine, ConsensusMessage, Vote};

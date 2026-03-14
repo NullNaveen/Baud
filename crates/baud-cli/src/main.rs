@@ -7,14 +7,17 @@ use tracing_subscriber::EnvFilter;
 
 use baud_core::crypto::{Address, Hash, KeyPair, Signature};
 use baud_core::types::{
-    GenesisAllocation, GenesisConfig, Transaction, TxPayload, ValidatorInfo,
-    QUANTA_PER_BAUD,
+    GenesisAllocation, GenesisConfig, Transaction, TxPayload, ValidatorInfo, QUANTA_PER_BAUD,
 };
 use baud_wallet::EncryptedWallet;
 
 /// Baud — CLI for the M2M Agent Ledger
 #[derive(Parser)]
-#[command(name = "baud", version, about = "Headless CLI for the Baud M2M agent ledger")]
+#[command(
+    name = "baud",
+    version,
+    about = "Headless CLI for the Baud M2M agent ledger"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -270,8 +273,7 @@ fn main() -> Result<()> {
         }
 
         Commands::Address { secret } => {
-            let kp = KeyPair::from_secret_hex(&secret)
-                .context("invalid secret key")?;
+            let kp = KeyPair::from_secret_hex(&secret).context("invalid secret key")?;
             println!("{}", kp.address().to_hex());
         }
 
@@ -530,8 +532,7 @@ fn main() -> Result<()> {
                 std::io::stdin().read_to_string(&mut buf)?;
                 buf
             } else {
-                std::fs::read_to_string(&tx_file)
-                    .context(format!("failed to read {tx_file}"))?
+                std::fs::read_to_string(&tx_file).context(format!("failed to read {tx_file}"))?
             };
 
             let rt = tokio::runtime::Runtime::new()?;

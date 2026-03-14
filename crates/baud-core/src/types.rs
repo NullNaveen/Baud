@@ -62,9 +62,7 @@ pub enum TxPayload {
         preimage: Vec<u8>,
     },
     /// Refund escrowed funds after the deadline has passed.
-    EscrowRefund {
-        escrow_id: Hash,
-    },
+    EscrowRefund { escrow_id: Hash },
     /// Register / update agent metadata on-chain.
     AgentRegister {
         /// Human-readable agent name (max 64 bytes, UTF-8).
@@ -144,8 +142,7 @@ impl Transaction {
 
     /// Compute the full transaction hash (including signature).
     pub fn hash(&self) -> Hash {
-        let bytes = bincode::serialize(self)
-            .expect("serialization of tx should never fail");
+        let bytes = bincode::serialize(self).expect("serialization of tx should never fail");
         Hash::digest(&bytes)
     }
 
@@ -181,7 +178,10 @@ impl Transaction {
                 }
             }
             TxPayload::EscrowCreate {
-                recipient, amount, deadline, ..
+                recipient,
+                amount,
+                deadline,
+                ..
             } => {
                 if self.sender == *recipient {
                     return Err(BaudError::SelfTransfer);
@@ -198,9 +198,7 @@ impl Transaction {
             }
             TxPayload::EscrowRelease { preimage, .. } => {
                 if preimage.len() > 1024 {
-                    return Err(BaudError::InvalidEscrowProof(
-                        "preimage too large".into(),
-                    ));
+                    return Err(BaudError::InvalidEscrowProof("preimage too large".into()));
                 }
             }
             TxPayload::EscrowRefund { .. } => {}
@@ -237,7 +235,9 @@ impl Transaction {
                 }
             }
             TxPayload::MilestoneEscrowCreate {
-                recipient, milestones, deadline,
+                recipient,
+                milestones,
+                deadline,
             } => {
                 if self.sender == *recipient {
                     return Err(BaudError::SelfTransfer);
@@ -262,12 +262,14 @@ impl Transaction {
             }
             TxPayload::MilestoneRelease { preimage, .. } => {
                 if preimage.len() > 1024 {
-                    return Err(BaudError::InvalidEscrowProof(
-                        "preimage too large".into(),
-                    ));
+                    return Err(BaudError::InvalidEscrowProof("preimage too large".into()));
                 }
             }
-            TxPayload::SetSpendingPolicy { co_signers, required_co_signers, .. } => {
+            TxPayload::SetSpendingPolicy {
+                co_signers,
+                required_co_signers,
+                ..
+            } => {
                 if co_signers.len() > MAX_CO_SIGNERS {
                     return Err(BaudError::TransactionTooLarge {
                         size: co_signers.len(),
@@ -325,8 +327,7 @@ impl BlockHeader {
     }
 
     pub fn hash(&self) -> Hash {
-        let bytes = bincode::serialize(self)
-            .expect("header serialization should never fail");
+        let bytes = bincode::serialize(self).expect("header serialization should never fail");
         Hash::digest(&bytes)
     }
 }

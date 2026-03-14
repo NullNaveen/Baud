@@ -1,6 +1,4 @@
-use ed25519_dalek::{
-    Signature as DalekSignature, Signer, SigningKey, Verifier, VerifyingKey,
-};
+use ed25519_dalek::{Signature as DalekSignature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
@@ -82,8 +80,7 @@ impl Hash {
     }
 
     pub fn from_hex(s: &str) -> BaudResult<Self> {
-        let bytes =
-            hex::decode(s).map_err(|e| BaudError::Serialization(e.to_string()))?;
+        let bytes = hex::decode(s).map_err(|e| BaudError::Serialization(e.to_string()))?;
         if bytes.len() != 32 {
             return Err(BaudError::Serialization("invalid hash length".into()));
         }
@@ -126,7 +123,7 @@ pub fn merkle_root(hashes: &[Hash]) -> Hash {
 
     let mut level: Vec<Hash> = hashes.to_vec();
     while level.len() > 1 {
-        let mut next = Vec::with_capacity((level.len() + 1) / 2);
+        let mut next = Vec::with_capacity(level.len().div_ceil(2));
         for chunk in level.chunks(2) {
             if chunk.len() == 2 {
                 next.push(Hash::digest_many(&[&chunk[0].0, &chunk[1].0]));
@@ -152,8 +149,7 @@ impl Signature {
     }
 
     pub fn from_hex(s: &str) -> BaudResult<Self> {
-        let bytes =
-            hex::decode(s).map_err(|e| BaudError::Serialization(e.to_string()))?;
+        let bytes = hex::decode(s).map_err(|e| BaudError::Serialization(e.to_string()))?;
         if bytes.len() != 64 {
             return Err(BaudError::Serialization("invalid signature length".into()));
         }
@@ -237,13 +233,11 @@ pub fn verify_signature(
     message: &[u8],
     signature: &Signature,
 ) -> BaudResult<()> {
-    let pk = VerifyingKey::from_bytes(&address.0).map_err(|e| {
-        BaudError::VerificationFailed(format!("bad public key: {e}"))
-    })?;
+    let pk = VerifyingKey::from_bytes(&address.0)
+        .map_err(|e| BaudError::VerificationFailed(format!("bad public key: {e}")))?;
     let sig = DalekSignature::from_bytes(&signature.0);
-    pk.verify(message, &sig).map_err(|e| {
-        BaudError::InvalidSignature(format!("{e}"))
-    })
+    pk.verify(message, &sig)
+        .map_err(|e| BaudError::InvalidSignature(format!("{e}")))
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -293,11 +287,7 @@ mod tests {
 
     #[test]
     fn merkle_root_deterministic() {
-        let hashes = vec![
-            Hash::digest(b"a"),
-            Hash::digest(b"b"),
-            Hash::digest(b"c"),
-        ];
+        let hashes = vec![Hash::digest(b"a"), Hash::digest(b"b"), Hash::digest(b"c")];
         let r1 = merkle_root(&hashes);
         let r2 = merkle_root(&hashes);
         assert_eq!(r1, r2);

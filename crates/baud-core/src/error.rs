@@ -76,7 +76,11 @@ pub enum BaudError {
     InvalidSpendingPolicy { required: u32, available: usize },
 
     #[error("nonce gap too large: current nonce {current}, got {got}, max gap {max_gap}")]
-    NonceGapTooLarge { current: u64, got: u64, max_gap: u64 },
+    NonceGapTooLarge {
+        current: u64,
+        got: u64,
+        max_gap: u64,
+    },
 
     #[error("too many active escrows for account (max: {max})")]
     TooManyEscrows { max: usize },

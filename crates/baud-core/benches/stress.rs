@@ -2,14 +2,13 @@
 //!
 //! Run with: cargo bench -p baud-core
 
-use criterion::{criterion_group, criterion_main, Criterion, BatchSize};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use baud_core::crypto::{Hash, KeyPair, Signature};
 use baud_core::mempool::Mempool;
 use baud_core::state::WorldState;
 use baud_core::types::{
-    Account, GenesisAllocation, GenesisConfig, Transaction, TxPayload,
-    QUANTA_PER_BAUD,
+    Account, GenesisAllocation, GenesisConfig, Transaction, TxPayload, QUANTA_PER_BAUD,
 };
 
 fn now_ms() -> u64 {
@@ -19,11 +18,20 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 
-fn make_signed_transfer(kp: &KeyPair, to: &baud_core::crypto::Address, amount: u128, nonce: u64) -> Transaction {
+fn make_signed_transfer(
+    kp: &KeyPair,
+    to: &baud_core::crypto::Address,
+    amount: u128,
+    nonce: u64,
+) -> Transaction {
     let mut tx = Transaction {
         sender: kp.address(),
         nonce,
-        payload: TxPayload::Transfer { to: *to, amount, memo: None },
+        payload: TxPayload::Transfer {
+            to: *to,
+            amount,
+            memo: None,
+        },
         timestamp: now_ms(),
         chain_id: "bench".into(),
         signature: Signature::zero(),

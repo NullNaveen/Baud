@@ -18,7 +18,11 @@ use baud_storage::BaudStore;
 
 /// Baud Node — Full node for the M2M Agent Ledger
 #[derive(Parser)]
-#[command(name = "baud-node", version, about = "Full validator node for the Baud M2M agent ledger")]
+#[command(
+    name = "baud-node",
+    version,
+    about = "Full validator node for the Baud M2M agent ledger"
+)]
 struct Cli {
     /// Path to the genesis configuration JSON file.
     #[arg(long, default_value = "genesis.json")]
@@ -58,8 +62,7 @@ async fn main() -> Result<()> {
     // Initialize structured logging.
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .with_target(true)
         .init();
@@ -69,24 +72,25 @@ async fn main() -> Result<()> {
     // ── Load genesis ────────────────────────────────────────────────────
     let genesis_json = std::fs::read_to_string(&cli.genesis)
         .context(format!("failed to read genesis file: {}", cli.genesis))?;
-    let genesis: GenesisConfig = serde_json::from_str(&genesis_json)
-        .context("failed to parse genesis config")?;
+    let genesis: GenesisConfig =
+        serde_json::from_str(&genesis_json).context("failed to parse genesis config")?;
 
     info!(chain_id = %genesis.chain_id, "loading genesis configuration");
 
     // ── Initialize our keypair ──────────────────────────────────────────
-    let keypair = Arc::new(
-        KeyPair::from_secret_hex(&cli.secret_key).context("invalid secret key")?,
-    );
+    let keypair =
+        Arc::new(KeyPair::from_secret_hex(&cli.secret_key).context("invalid secret key")?);
     info!(address = %keypair.address(), "node identity loaded");
 
     // ── Initialize world state from genesis ─────────────────────────────
     let store = Arc::new(
-        BaudStore::open(std::path::Path::new(&cli.data_dir))
-            .context("failed to open storage")?,
+        BaudStore::open(std::path::Path::new(&cli.data_dir)).context("failed to open storage")?,
     );
 
-    let state = match store.load_state().context("failed to load persisted state")? {
+    let state = match store
+        .load_state()
+        .context("failed to load persisted state")?
+    {
         Some(persisted) => {
             info!(height = persisted.height, "resumed from persisted state");
             persisted
@@ -109,11 +113,7 @@ async fn main() -> Result<()> {
         ..ConsensusConfig::default()
     };
 
-    let validator_addresses: Vec<Address> = genesis
-        .validators
-        .iter()
-        .map(|v| v.address)
-        .collect();
+    let validator_addresses: Vec<Address> = genesis.validators.iter().map(|v| v.address).collect();
 
     // ── Create consensus engine ─────────────────────────────────────────
     let (consensus_engine, mut finalized_rx, _consensus_tx) = ConsensusEngine::new(
@@ -251,7 +251,12 @@ async fn main() -> Result<()> {
     // Wait for tasks to finish (with timeout).
     let _ = tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        futures_util::future::join_all(vec![api_handle, consensus_handle, network_handle, log_handle]),
+        futures_util::future::join_all(vec![
+            api_handle,
+            consensus_handle,
+            network_handle,
+            log_handle,
+        ]),
     )
     .await;
 

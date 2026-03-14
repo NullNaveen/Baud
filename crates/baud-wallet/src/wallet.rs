@@ -105,15 +105,9 @@ impl EncryptedWallet {
 
     /// Create a new wallet file with an initial keypair.
     /// Fails if the file already exists.
-    pub fn create(
-        &self,
-        password: &str,
-        label: &str,
-    ) -> Result<WalletEntry, WalletError> {
+    pub fn create(&self, password: &str, label: &str) -> Result<WalletEntry, WalletError> {
         if self.path.exists() {
-            return Err(WalletError::AlreadyExists(
-                self.path.display().to_string(),
-            ));
+            return Err(WalletError::AlreadyExists(self.path.display().to_string()));
         }
 
         let kp = KeyPair::generate();
@@ -142,8 +136,7 @@ impl EncryptedWallet {
         label: &str,
         secret_hex: &str,
     ) -> Result<WalletEntry, WalletError> {
-        let kp = KeyPair::from_secret_hex(secret_hex)
-            .map_err(|_| WalletError::DecryptionFailed)?;
+        let kp = KeyPair::from_secret_hex(secret_hex).map_err(|_| WalletError::DecryptionFailed)?;
 
         let mut plaintext = if self.path.exists() {
             self.read_encrypted(password)?
@@ -190,11 +183,7 @@ impl EncryptedWallet {
     }
 
     /// Export the secret key for a specific label.
-    pub fn export(
-        &self,
-        password: &str,
-        label: &str,
-    ) -> Result<WalletEntry, WalletError> {
+    pub fn export(&self, password: &str, label: &str) -> Result<WalletEntry, WalletError> {
         if !self.path.exists() {
             return Err(WalletError::NotFound(self.path.display().to_string()));
         }
@@ -216,18 +205,10 @@ impl EncryptedWallet {
 
     fn derive_key(password: &str, salt: &SaltString) -> [u8; 32] {
         let params = Self::argon2_params();
-        let argon2 = Argon2::new(
-            argon2::Algorithm::Argon2id,
-            argon2::Version::V0x13,
-            params,
-        );
+        let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
         let mut key = [0u8; 32];
         argon2
-            .hash_password_into(
-                password.as_bytes(),
-                salt.as_str().as_bytes(),
-                &mut key,
-            )
+            .hash_password_into(password.as_bytes(), salt.as_str().as_bytes(), &mut key)
             .expect("argon2 hash should not fail with valid params");
         key
     }
@@ -245,8 +226,7 @@ impl EncryptedWallet {
         let salt = SaltString::generate(&mut OsRng);
         let mut key = Self::derive_key(password, &salt);
 
-        let cipher = Aes256Gcm::new_from_slice(&key)
-            .expect("32-byte key is valid for AES-256-GCM");
+        let cipher = Aes256Gcm::new_from_slice(&key).expect("32-byte key is valid for AES-256-GCM");
         key.zeroize();
 
         let mut nonce_bytes = [0u8; 12];
@@ -279,10 +259,7 @@ impl EncryptedWallet {
         Ok(())
     }
 
-    fn read_encrypted(
-        &self,
-        password: &str,
-    ) -> Result<WalletPlaintext, WalletError> {
+    fn read_encrypted(&self, password: &str) -> Result<WalletPlaintext, WalletError> {
         let data = std::fs::read_to_string(&self.path)?;
         let envelope: WalletEnvelope = serde_json::from_str(&data)?;
 
@@ -290,8 +267,7 @@ impl EncryptedWallet {
             .map_err(|_| WalletError::DecryptionFailed)?;
 
         let mut key = Self::derive_key(password, &salt);
-        let cipher = Aes256Gcm::new_from_slice(&key)
-            .expect("32-byte key is valid for AES-256-GCM");
+        let cipher = Aes256Gcm::new_from_slice(&key).expect("32-byte key is valid for AES-256-GCM");
         key.zeroize();
 
         let nonce_bytes =
@@ -301,8 +277,8 @@ impl EncryptedWallet {
         }
         let nonce = Nonce::from_slice(&nonce_bytes);
 
-        let ciphertext = hex::decode(&envelope.ciphertext)
-            .map_err(|_| WalletError::DecryptionFailed)?;
+        let ciphertext =
+            hex::decode(&envelope.ciphertext).map_err(|_| WalletError::DecryptionFailed)?;
 
         let json_bytes = cipher
             .decrypt(nonce, ciphertext.as_slice())
