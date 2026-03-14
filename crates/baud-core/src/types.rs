@@ -267,11 +267,17 @@ impl Transaction {
                     ));
                 }
             }
-            TxPayload::SetSpendingPolicy { co_signers, .. } => {
+            TxPayload::SetSpendingPolicy { co_signers, required_co_signers, .. } => {
                 if co_signers.len() > MAX_CO_SIGNERS {
                     return Err(BaudError::TransactionTooLarge {
                         size: co_signers.len(),
                         max: MAX_CO_SIGNERS,
+                    });
+                }
+                if *required_co_signers > co_signers.len() as u32 {
+                    return Err(BaudError::InvalidSpendingPolicy {
+                        required: *required_co_signers,
+                        available: co_signers.len(),
                     });
                 }
             }

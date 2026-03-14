@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
+/// Maximum number of active escrows (regular + milestone) a single account can hold.
+const MAX_ESCROWS_PER_ACCOUNT: usize = 1000;
+
 use crate::crypto::{verify_signature, Address, Hash};
 use crate::error::{BaudError, BaudResult};
 use crate::types::{
@@ -144,6 +147,15 @@ impl WorldState {
                         need: *amount,
                     });
                 }
+                // Spending policy enforcement
+                if let Some(ref policy) = account.spending_policy {
+                    if *amount > policy.auto_approve_limit && policy.required_co_signers > 0 {
+                        return Err(BaudError::SpendingPolicyViolation {
+                            amount: *amount,
+                            limit: policy.auto_approve_limit,
+                        });
+                    }
+                }
             }
             TxPayload::EscrowCreate { amount, .. } => {
                 if account.balance < *amount {
@@ -151,6 +163,15 @@ impl WorldState {
                         have: account.balance,
                         need: *amount,
                     });
+                }
+                // Spending policy enforcement
+                if let Some(ref policy) = account.spending_policy {
+                    if *amount > policy.auto_approve_limit && policy.required_co_signers > 0 {
+                        return Err(BaudError::SpendingPolicyViolation {
+                            amount: *amount,
+                            limit: policy.auto_approve_limit,
+                        });
+                    }
                 }
             }
             TxPayload::EscrowRelease { escrow_id, preimage } => {
@@ -327,6 +348,12 @@ impl WorldState {
                 hash_lock,
                 deadline,
             } => {
+                // Enforce per-account escrow limit.
+                let sender_escrow_count = self.escrows.values().filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active).count()
+                    + self.milestone_escrows.values().filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active).count();
+                if sender_escrow_count >= MAX_ESCROWS_PER_ACCOUNT {
+                    return Err(BaudError::TooManyEscrows { max: MAX_ESCROWS_PER_ACCOUNT });
+                }
                 // Debit sender.
                 {
                     let sender = self.accounts.get_mut(&sender_addr).unwrap();
@@ -413,6 +440,12 @@ impl WorldState {
                 milestones,
                 deadline,
             } => {
+                // Enforce per-account escrow limit.
+                let sender_escrow_count = self.escrows.values().filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active).count()
+                    + self.milestone_escrows.values().filter(|e| e.sender == sender_addr && e.status == EscrowStatus::Active).count();
+                if sender_escrow_count >= MAX_ESCROWS_PER_ACCOUNT {
+                    return Err(BaudError::TooManyEscrows { max: MAX_ESCROWS_PER_ACCOUNT });
+                }
                 // Sum total and debit sender.
                 let total: Amount = milestones
                     .iter()

@@ -1,4 +1,5 @@
 use std::net::IpAddr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -32,6 +33,8 @@ pub struct AppState {
     pub chain_id: String,
     pub node_address: String,
     pub start_time: u64,
+    pub tx_processed: Arc<AtomicU64>,
+    pub tx_rejected: Arc<AtomicU64>,
 }
 
 // ─── Request/Response DTOs ──────────────────────────────────────────────────
@@ -249,6 +252,7 @@ pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Ro
         .route("/v1/tx/{hash}", get(get_tx))
         .route("/v1/escrow/{id}", get(get_escrow))
         .route("/v1/mempool", get(get_mempool))
+        .route("/v1/health", get(get_health))
         .route("/v1/metrics", get(get_metrics))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
         .layer(middleware::from_fn_with_state(limiter, rate_limit_middleware))
@@ -318,10 +322,14 @@ async fn submit_tx(
     Json(req): Json<SubmitTxRequest>,
 ) -> Result<(StatusCode, Json<SubmitTxResponse>), (StatusCode, Json<ErrorResponse>)> {
     // Parse the request into a Transaction.
-    let tx = parse_tx_request(req)?;
+    let tx = parse_tx_request(req).map_err(|e| {
+        state.tx_rejected.fetch_add(1, Ordering::Relaxed);
+        e
+    })?;
 
     // Validate structure.
     tx.validate_structure().map_err(|e| {
+        state.tx_rejected.fetch_add(1, Ordering::Relaxed);
         (
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
@@ -339,6 +347,7 @@ async fn submit_tx(
     {
         let ws = state.world_state.read();
         ws.validate_transaction(&tx, now).map_err(|e| {
+            state.tx_rejected.fetch_add(1, Ordering::Relaxed);
             (
                 StatusCode::BAD_REQUEST,
                 Json(ErrorResponse {
@@ -350,6 +359,7 @@ async fn submit_tx(
 
     // Add to mempool.
     let tx_hash = state.mempool.add(tx).map_err(|e| {
+        state.tx_rejected.fetch_add(1, Ordering::Relaxed);
         (
             StatusCode::CONFLICT,
             Json(ErrorResponse {
@@ -358,6 +368,7 @@ async fn submit_tx(
         )
     })?;
 
+    state.tx_processed.fetch_add(1, Ordering::Relaxed);
     info!(tx = %tx_hash, "transaction accepted into mempool");
 
     Ok((
@@ -460,6 +471,8 @@ async fn get_metrics(State(state): State<AppState>) -> impl IntoResponse {
         .unwrap_or_default()
         .as_millis() as u64;
     let uptime = now.saturating_sub(state.start_time);
+    let tx_ok = state.tx_processed.load(Ordering::Relaxed);
+    let tx_err = state.tx_rejected.load(Ordering::Relaxed);
 
     let metrics = format!(
         "# HELP baud_block_height Current block height\n\
@@ -468,19 +481,31 @@ async fn get_metrics(State(state): State<AppState>) -> impl IntoResponse {
          # HELP baud_accounts_total Total number of accounts\n\
          # TYPE baud_accounts_total gauge\n\
          baud_accounts_total {}\n\
-         # HELP baud_escrows_total Total number of escrows\n\
-         # TYPE baud_escrows_total gauge\n\
-         baud_escrows_total {}\n\
+         # HELP baud_escrows_active Active escrows\n\
+         # TYPE baud_escrows_active gauge\n\
+         baud_escrows_active {}\n\
+         # HELP baud_milestone_escrows_active Active milestone escrows\n\
+         # TYPE baud_milestone_escrows_active gauge\n\
+         baud_milestone_escrows_active {}\n\
          # HELP baud_mempool_size Current mempool size\n\
          # TYPE baud_mempool_size gauge\n\
          baud_mempool_size {}\n\
+         # HELP baud_tx_processed_total Total transactions processed\n\
+         # TYPE baud_tx_processed_total counter\n\
+         baud_tx_processed_total {}\n\
+         # HELP baud_tx_rejected_total Total transactions rejected\n\
+         # TYPE baud_tx_rejected_total counter\n\
+         baud_tx_rejected_total {}\n\
          # HELP baud_uptime_ms Node uptime in milliseconds\n\
          # TYPE baud_uptime_ms counter\n\
          baud_uptime_ms {}\n",
         ws.height,
         ws.accounts.len(),
-        ws.escrows.len() + ws.milestone_escrows.len(),
+        ws.escrows.len(),
+        ws.milestone_escrows.len(),
         state.mempool.len(),
+        tx_ok,
+        tx_err,
         uptime,
     );
 
@@ -489,6 +514,17 @@ async fn get_metrics(State(state): State<AppState>) -> impl IntoResponse {
         [("content-type", "text/plain; version=0.0.4; charset=utf-8")],
         metrics,
     )
+}
+
+/// Health check endpoint — returns 200 if the node is operational.
+async fn get_health(State(state): State<AppState>) -> impl IntoResponse {
+    let ws = state.world_state.read();
+    Json(serde_json::json!({
+        "status": "healthy",
+        "chain_id": state.chain_id,
+        "block_height": ws.height,
+        "accounts": ws.accounts.len(),
+    }))
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

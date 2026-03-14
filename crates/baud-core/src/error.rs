@@ -69,6 +69,18 @@ pub enum BaudError {
     #[error("milestone {index} already completed")]
     MilestoneAlreadyCompleted { index: u32 },
 
+    #[error("spending policy requires co-signer approval for amount {amount} (limit: {limit})")]
+    SpendingPolicyViolation { amount: u128, limit: u128 },
+
+    #[error("invalid spending policy: required_co_signers ({required}) exceeds co_signers count ({available})")]
+    InvalidSpendingPolicy { required: u32, available: usize },
+
+    #[error("nonce gap too large: current nonce {current}, got {got}, max gap {max_gap}")]
+    NonceGapTooLarge { current: u64, got: u64, max_gap: u64 },
+
+    #[error("too many active escrows for account (max: {max})")]
+    TooManyEscrows { max: usize },
+
     // ── Block ───────────────────────────────────────────────────────
     #[error("invalid block: {0}")]
     InvalidBlock(String),

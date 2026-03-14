@@ -534,6 +534,12 @@ impl ConsensusEngine {
                                     warn!(err = %e, "failed to apply finalized block from peer");
                                 }
                             }
+
+                            // Periodic cleanup: remove stale proposed blocks to prevent memory exhaustion.
+                            if proposed_blocks.len() > 100 {
+                                let cutoff = current_height.saturating_sub(10);
+                                proposed_blocks.retain(|_, block| block.header.height > cutoff);
+                            }
                         }
                     }
                 }

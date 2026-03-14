@@ -10,6 +10,12 @@ use crate::types::Transaction;
 /// Maximum number of pending transactions in the mempool.
 const DEFAULT_CAPACITY: usize = 100_000;
 
+/// Maximum nonce gap allowed above the highest pending nonce per sender.
+const MAX_NONCE_GAP: u64 = 100;
+
+/// Maximum pending transactions per sender.
+const MAX_PER_SENDER: usize = 1000;
+
 /// Thread-safe transaction mempool ordered by arrival.
 pub struct Mempool {
     /// Transactions indexed by hash for dedup.
@@ -50,11 +56,23 @@ impl Mempool {
         let mut ordered = self.ordered.write();
         let mut sender_nonces = self.sender_nonces.write();
 
+        // Per-sender limits: prevent spam and nonce-gap attacks
+        let sender_entry = sender_nonces.entry(tx.sender).or_default();
+        if sender_entry.len() >= MAX_PER_SENDER {
+            return Err(BaudError::MempoolFull(MAX_PER_SENDER));
+        }
+        if let Some(&max_nonce) = sender_entry.iter().max() {
+            if tx.nonce > max_nonce + MAX_NONCE_GAP {
+                return Err(BaudError::NonceGapTooLarge {
+                    current: max_nonce,
+                    got: tx.nonce,
+                    max_gap: MAX_NONCE_GAP,
+                });
+            }
+        }
+
         ordered.insert((tx.timestamp, tx_hash), tx_hash);
-        sender_nonces
-            .entry(tx.sender)
-            .or_default()
-            .push(tx.nonce);
+        sender_entry.push(tx.nonce);
         by_hash.insert(tx_hash, tx);
 
         debug!(tx = %tx_hash, pool_size = by_hash.len(), "tx added to mempool");

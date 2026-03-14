@@ -164,6 +164,8 @@ async fn main() -> Result<()> {
         chain_id: genesis.chain_id.clone(),
         node_address: keypair.address().to_hex(),
         start_time: now,
+        tx_processed: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        tx_rejected: Arc::new(std::sync::atomic::AtomicU64::new(0)),
     };
 
     let router = build_router(app_state);
