@@ -39,15 +39,28 @@ impl WorldState {
 
     /// Initialize from genesis config.
     pub fn from_genesis(config: &crate::types::GenesisConfig) -> BaudResult<Self> {
+        use crate::types::TOTAL_SUPPLY_QUANTA;
         let mut state = Self::new(config.chain_id.clone());
 
+        let mut total_allocated: Amount = 0;
         for alloc in &config.allocations {
+            total_allocated = total_allocated
+                .checked_add(alloc.balance)
+                .ok_or_else(|| BaudError::GenesisOverflow)?;
             let account = Account::with_balance(alloc.address, alloc.balance);
             state.accounts.insert(alloc.address, account);
         }
 
+        if total_allocated > TOTAL_SUPPLY_QUANTA {
+            return Err(BaudError::GenesisTotalSupplyExceeded {
+                allocated: total_allocated,
+                max: TOTAL_SUPPLY_QUANTA,
+            });
+        }
+
         debug!(
             accounts = state.accounts.len(),
+            total_allocated_baud = total_allocated / crate::types::QUANTA_PER_BAUD,
             "genesis state initialized"
         );
         Ok(state)

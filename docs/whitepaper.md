@@ -94,6 +94,8 @@ The system is composed of six Rust crates organized as a Cargo workspace:
 | Balance type | `u128` (max $3.4 \times 10^{38}$) |
 | Balance arithmetic | Checked (overflow/underflow = rejection) |
 | Transaction fees | 0 |
+| Total supply | 1,000,000,000 BAUD (hard cap enforced at genesis) |
+| Issuance model | Pre-minted at genesis; no mining, no block rewards |
 
 The u128 balance type with $10^{18}$ subdivision provides 18 decimal places of precision — matching Ethereum's wei — while the checked arithmetic ensures no balance can overflow or underflow. Zero fees mean agents never need to "top up gas" or estimate fee markets.
 
@@ -108,8 +110,9 @@ Transaction {
     sender:    Address,      // 32-byte Ed25519 public key
     nonce:     u64,          // Sequential per-sender (replay protection)
     timestamp: u64,          // Unix milliseconds
+    chain_id:  String,       // Chain identifier (cross-chain replay protection)
     payload:   Payload,      // One of the types below
-    signature: Signature,    // Ed25519 signature over (sender, nonce, timestamp, payload)
+    signature: Signature,    // Ed25519 signature over (sender, nonce, timestamp, chain_id, payload)
 }
 ```
 
@@ -286,6 +289,7 @@ Requester                          Worker
 - **Ed25519 signatures**: 128-bit security level. Every transaction must include a valid signature from the sender's key.
 - **BLAKE3 hashing**: 256-bit collision resistance. Used for block hashes, Merkle roots, escrow hash-locks, and message deduplication.
 - **Replay protection**: Monotonically increasing per-account nonces. Each transaction's nonce must exactly equal the account's current nonce.
+- **Cross-chain replay protection**: The `chain_id` is embedded in the signed hash of every transaction. A transaction signed for one Baud chain is cryptographically invalid on any other Baud chain with a different chain ID.
 
 ### 8.2 State Machine Safety
 
@@ -306,7 +310,7 @@ Requester                          Worker
 
 ### 9.1 Supply
 
-Total supply is configured at genesis. The recommended configuration is **1,000,000,000 BAUD** (1 billion), providing ample supply for a large-scale agent economy.
+Total supply is hard-capped at **1,000,000,000 BAUD** (1 billion = $10^{27}$ quanta). This cap is enforced in the genesis initialization code — any genesis configuration whose total allocations exceed this limit is rejected. There is no mining, no block rewards, and no inflation mechanism. All tokens exist from the first block.
 
 ### 9.2 Distribution
 
@@ -357,7 +361,7 @@ Baud is implemented in Rust for performance, safety, and correctness:
 - **Memory safety**: No garbage collector pauses, no null pointer dereferences, no data races.
 - **Performance**: Native compilation, zero-cost abstractions, async I/O via Tokio.
 - **Correctness**: Rust's type system and borrow checker prevent entire classes of bugs at compile time.
-- **Test coverage**: 31 tests covering crypto operations, state transitions, escrow lifecycle, mempool behavior, consensus protocol, overflow protection, and replay resistance.
+- **Test coverage**: 36 tests covering crypto operations, state transitions, escrow lifecycle, wallet encryption, mempool behavior, consensus protocol, overflow protection, cross-chain replay resistance, and nonce replay resistance.
 
 ### 11.1 Dependencies
 

@@ -11,6 +11,12 @@ pub type Amount = u128;
 /// 1 BAUD expressed in quanta.
 pub const QUANTA_PER_BAUD: Amount = 1_000_000_000_000_000_000;
 
+/// Total supply: 1 billion BAUD. All tokens exist from genesis; no mining.
+pub const TOTAL_SUPPLY_BAUD: u64 = 1_000_000_000;
+
+/// Total supply in quanta (1 billion * 10^18).
+pub const TOTAL_SUPPLY_QUANTA: Amount = (TOTAL_SUPPLY_BAUD as u128) * QUANTA_PER_BAUD;
+
 // ─── Transaction types ──────────────────────────────────────────────────────
 
 /// Every action on the ledger is a signed transaction.

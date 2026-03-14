@@ -83,6 +83,12 @@ pub enum BaudError {
     #[error("genesis already initialized")]
     GenesisAlreadyInitialized,
 
+    #[error("genesis allocation overflow")]
+    GenesisOverflow,
+
+    #[error("genesis total supply exceeded: allocated {allocated} quanta, max {max} quanta")]
+    GenesisTotalSupplyExceeded { allocated: u128, max: u128 },
+
     // ── Mempool ─────────────────────────────────────────────────────
     #[error("mempool is full (capacity: {0})")]
     MempoolFull(usize),
