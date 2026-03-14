@@ -13,6 +13,7 @@ baud-core.workspace = true
 baud-consensus.workspace = true
 baud-network.workspace = true
 baud-api.workspace = true
+baud-storage.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

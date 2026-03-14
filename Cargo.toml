@@ -7,6 +7,7 @@ members = [
     "crates/baud-api",
     "crates/baud-cli",
     "crates/baud-node",
+    "crates/baud-storage",
 ]
 
 [workspace.package]
@@ -67,6 +68,10 @@ baud-core = { path = "crates/baud-core" }
 baud-consensus = { path = "crates/baud-consensus" }
 baud-network = { path = "crates/baud-network" }
 baud-api = { path = "crates/baud-api" }
+baud-storage = { path = "crates/baud-storage" }
+
+# Storage
+sled = "0.34"
 
 [profile.release]
 opt-level = 3

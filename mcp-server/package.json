@@ -1,0 +1,16 @@
+{
+  "name": "baud-mcp-server",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for the Baud M2M Agent Ledger",
+  "main": "index.js",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["baud", "mcp", "ai-agents", "cryptocurrency", "m2m"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NullNaveen/Baud"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

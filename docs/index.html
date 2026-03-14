@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baud — M2M Ledger for AI Agents</title>
+    <meta name="description" content="Ultra-secure, feeless Machine-to-Machine ledger for autonomous AI agent economies. Native escrow, agent identity, API-first.">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --border: #1e1e2e;
+            --text: #e0e0e8;
+            --muted: #8888a0;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --green: #34d399;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+        /* Hero */
+        .hero {
+            padding: 100px 0 80px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--accent-light), var(--green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero .tagline {
+            font-size: 1.25rem;
+            color: var(--muted);
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            padding: 12px 28px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .btn:hover { transform: translateY(-2px); }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        /* Features */
+        .features {
+            padding: 80px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .feature {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
+        }
+
+        .feature h3 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+
+        .feature p {
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        /* Code sample */
+        .code-section {
+            padding: 60px 0;
+        }
+
+        .code-section h2 {
+            font-size: 2rem;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .code-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 0;
+        }
+
+        .code-tab {
+            padding: 8px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .code-tab.active {
+            background: #1a1a2a;
+            color: var(--text);
+        }
+
+        pre {
+            background: #1a1a2a;
+            border: 1px solid var(--border);
+            border-radius: 0 8px 8px 8px;
+            padding: 24px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
+
+        code { color: var(--accent-light); }
+        .cm { color: var(--muted); }
+        .str { color: var(--green); }
+        .kw { color: #f472b6; }
+
+        /* Stats */
+        .stats {
+            padding: 60px 0;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-light);
+        }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+
+        /* Architecture */
+        .arch {
+            padding: 60px 0;
+        }
+
+        .arch h2 {
+            font-size: 2rem;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .arch-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .arch-item h4 {
+            font-size: 0.95rem;
+            color: var(--accent-light);
+            margin-bottom: 4px;
+        }
+
+        .arch-item p {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        /* Footer */
+        footer {
+            padding: 40px 0;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+        }
+
+        footer a { color: var(--accent-light); text-decoration: none; }
+
+        @media (max-width: 640px) {
+            .hero h1 { font-size: 2.5rem; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .arch-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <section class="hero">
+            <h1>Baud</h1>
+            <p class="tagline">
+                Ultra-secure, feeless Machine-to-Machine ledger for autonomous AI agent economies.
+                Native escrow. Agent identity. API-first. Zero fees.
+            </p>
+            <div class="hero-buttons">
+                <a href="https://github.com/NullNaveen/Baud" class="btn btn-primary">GitHub &rarr;</a>
+                <a href="https://github.com/NullNaveen/Baud/blob/main/docs/whitepaper.md" class="btn btn-secondary">Whitepaper</a>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="feature">
+                <div class="feature-icon">&#9889;</div>
+                <h3>Zero Fees</h3>
+                <p>Every transaction is free. Agents settle sub-cent micro-payments without gas overhead. 1 BAUD = 10<sup>18</sup> quanta.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#128274;</div>
+                <h3>Trustless Escrow</h3>
+                <p>Hash-time-locked contracts as a first-class primitive. Lock funds, prove delivery with a preimage, settle atomically.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#129302;</div>
+                <h3>Agent Identity</h3>
+                <p>On-chain registration of name, endpoint, and capabilities. Agents discover and verify each other without a directory.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#128187;</div>
+                <h3>API-First</h3>
+                <p>REST endpoints for everything. No browser wallet, no pop-ups. Built for headless, programmatic operation.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#128737;</div>
+                <h3>BFT Consensus</h3>
+                <p>Round-robin leader rotation with &gt;&#8532; quorum Byzantine fault tolerance. ~1s deterministic finality.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#129513;</div>
+                <h3>Built in Rust</h3>
+                <p>Memory-safe, zero-cost abstractions, async I/O. Ed25519 signatures + BLAKE3 hashing. Zero unsafe code.</p>
+            </div>
+        </section>
+
+        <section class="code-section">
+            <h2>Start in 4 Lines</h2>
+            <div class="code-tabs">
+                <div class="code-tab active">Python SDK</div>
+            </div>
+            <pre><code><span class="kw">from</span> baud_sdk <span class="kw">import</span> BaudClient, KeyPair, QUANTA_PER_BAUD
+
+kp = KeyPair.generate()
+client = BaudClient(<span class="str">"http://localhost:8080"</span>, keypair=kp)
+client.send(to=<span class="str">"&lt;recipient&gt;"</span>, amount=<span class="str">QUANTA_PER_BAUD</span>)  <span class="cm"># Send 1 BAUD, zero fees</span></code></pre>
+        </section>
+
+        <section class="stats">
+            <div>
+                <div class="stat-value">0</div>
+                <div class="stat-label">Transaction fees</div>
+            </div>
+            <div>
+                <div class="stat-value">~1s</div>
+                <div class="stat-label">Finality</div>
+            </div>
+            <div>
+                <div class="stat-value">10<sup>18</sup></div>
+                <div class="stat-label">Quanta / BAUD</div>
+            </div>
+            <div>
+                <div class="stat-value">31</div>
+                <div class="stat-label">Tests passing</div>
+            </div>
+        </section>
+
+        <section class="arch">
+            <h2>Architecture</h2>
+            <div class="arch-grid">
+                <div class="arch-item">
+                    <h4>baud-core</h4>
+                    <p>Crypto, types, state, mempool</p>
+                </div>
+                <div class="arch-item">
+                    <h4>baud-consensus</h4>
+                    <p>BFT engine, leader rotation</p>
+                </div>
+                <div class="arch-item">
+                    <h4>baud-network</h4>
+                    <p>P2P WebSocket gossip</p>
+                </div>
+                <div class="arch-item">
+                    <h4>baud-api</h4>
+                    <p>REST API (Axum)</p>
+                </div>
+                <div class="arch-item">
+                    <h4>baud-cli</h4>
+                    <p>Key mgmt, offline signing</p>
+                </div>
+                <div class="arch-item">
+                    <h4>baud-node</h4>
+                    <p>Full node binary</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>MIT License &middot; <a href="https://github.com/NullNaveen/Baud">NullNaveen/Baud</a></p>
+        </div>
+    </footer>
+</body>
+</html>

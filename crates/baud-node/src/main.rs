@@ -14,6 +14,7 @@ use baud_core::mempool::Mempool;
 use baud_core::state::WorldState;
 use baud_core::types::GenesisConfig;
 use baud_network::{NetworkConfig, NetworkNode};
+use baud_storage::BaudStore;
 
 /// Baud Node — Full node for the M2M Agent Ledger
 #[derive(Parser)]
@@ -46,6 +47,10 @@ struct Cli {
     /// Maximum transactions per block.
     #[arg(long, default_value = "10000")]
     max_txs_per_block: usize,
+
+    /// Data directory for persistent storage.
+    #[arg(long, default_value = "node_data")]
+    data_dir: String,
 }
 
 #[tokio::main]
@@ -76,7 +81,22 @@ async fn main() -> Result<()> {
     info!(address = %keypair.address(), "node identity loaded");
 
     // ── Initialize world state from genesis ─────────────────────────────
-    let state = WorldState::from_genesis(&genesis).context("failed to init state")?;
+    let store = Arc::new(
+        BaudStore::open(std::path::Path::new(&cli.data_dir))
+            .context("failed to open storage")?,
+    );
+
+    let state = match store.load_state().context("failed to load persisted state")? {
+        Some(persisted) => {
+            info!(height = persisted.height, "resumed from persisted state");
+            persisted
+        }
+        None => {
+            let s = WorldState::from_genesis(&genesis).context("failed to init state")?;
+            info!("initialized fresh state from genesis");
+            s
+        }
+    };
     let state = Arc::new(RwLock::new(state));
 
     // ── Initialize mempool ──────────────────────────────────────────────
@@ -177,7 +197,9 @@ async fn main() -> Result<()> {
         }
     });
 
-    // ── Log finalized blocks ────────────────────────────────────────────
+    // ── Log finalized blocks and persist state ─────────────────────────
+    let persist_state = Arc::clone(&state);
+    let persist_store = Arc::clone(&store);
     let log_handle = tokio::spawn(async move {
         while let Ok(finalized) = finalized_rx.recv().await {
             info!(
@@ -187,6 +209,11 @@ async fn main() -> Result<()> {
                 votes = finalized.votes.len(),
                 "block finalized"
             );
+            // Persist state every block.
+            let ws = persist_state.read().clone();
+            if let Err(e) = persist_store.save_state(&ws) {
+                tracing::error!(error = %e, "failed to persist state");
+            }
         }
     });
 
@@ -208,6 +235,16 @@ async fn main() -> Result<()> {
 
     info!("shutdown signal received, stopping node...");
     let _ = shutdown_tx.send(());
+
+    // Persist final state before shutdown.
+    {
+        let ws = state.read().clone();
+        if let Err(e) = store.save_state(&ws) {
+            tracing::error!(error = %e, "failed to persist state on shutdown");
+        } else {
+            info!(height = ws.height, "state persisted on shutdown");
+        }
+    }
 
     // Wait for tasks to finish (with timeout).
     let _ = tokio::time::timeout(
