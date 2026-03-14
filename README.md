@@ -1,6 +1,10 @@
 # Baud
 
-**Ultra-secure Machine-to-Machine ledger for autonomous AI agents.**
+[![CI](https://github.com/NullNaveen/Baud/actions/workflows/ci.yml/badge.svg)](https://github.com/NullNaveen/Baud/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
+
+**Feeless cryptocurrency for AI agent economies.**
 
 Baud is a feeless micro-transaction cryptocurrency purpose-built for AI-agent economies. It provides hash-time-locked escrow contracts, BFT consensus, encrypted wallet management, and a zero-UI API-first interface designed for headless, programmatic operation.
 
@@ -76,7 +80,7 @@ cargo build --release
 cargo test
 ```
 
-36 tests across unit and integration suites covering crypto, state transitions, escrow lifecycle, mempool, consensus, wallet encryption, overflow protection, and replay/cross-chain attack resistance.
+40 tests across unit and integration suites covering crypto, state transitions, escrow lifecycle, mempool, consensus, wallet encryption, overflow protection, and replay/cross-chain attack resistance.
 
 ## CLI Usage
 
