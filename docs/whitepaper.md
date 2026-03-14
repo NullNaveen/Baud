@@ -361,7 +361,7 @@ Baud is implemented in Rust for performance, safety, and correctness:
 - **Memory safety**: No garbage collector pauses, no null pointer dereferences, no data races.
 - **Performance**: Native compilation, zero-cost abstractions, async I/O via Tokio.
 - **Correctness**: Rust's type system and borrow checker prevent entire classes of bugs at compile time.
-- **Test coverage**: 36 tests covering crypto operations, state transitions, escrow lifecycle, wallet encryption, mempool behavior, consensus protocol, overflow protection, cross-chain replay resistance, and nonce replay resistance.
+- **Test coverage**: 40 tests covering crypto operations, state transitions, escrow lifecycle, milestone escrow, spending policies, wallet encryption, mempool behavior, consensus protocol, overflow protection, cross-chain replay resistance, and nonce replay resistance.
 
 ### 11.1 Dependencies
 
