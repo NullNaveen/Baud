@@ -2,7 +2,7 @@
 
 **Ultra-secure Machine-to-Machine ledger for autonomous AI agents.**
 
-Baud is a feeless micro-transaction cryptocurrency purpose-built for AI-agent economies. It provides hash-time-locked escrow contracts, BFT consensus, and a zero-UI API-first interface designed for headless, programmatic operation.
+Baud is a feeless micro-transaction cryptocurrency purpose-built for AI-agent economies. It provides hash-time-locked escrow contracts, BFT consensus, encrypted wallet management, and a zero-UI API-first interface designed for headless, programmatic operation.
 
 ## Key Features
 
@@ -10,8 +10,15 @@ Baud is a feeless micro-transaction cryptocurrency purpose-built for AI-agent ec
 - **Hash-time-locked escrow** — Trustless payment channels using BLAKE3 hash-locks with configurable deadlines
 - **BFT consensus** — Round-robin leader selection with >⅔ quorum Byzantine fault tolerance
 - **Agent-native identity** — Ed25519 keypairs as first-class agent identifiers with optional metadata (name, endpoint, capabilities)
+- **Cross-chain replay protection** — Chain ID embedded in every transaction signature
+- **Encrypted wallet** — AES-256-GCM + Argon2id key derivation for secure key storage
+- **Rate limiting** — Token-bucket middleware (60 burst, 20 req/s) on the API layer
 - **API-first** — REST endpoint set designed for programmatic consumption; no browser UI required
+- **Python SDK** — Full client library with high-level payment wrappers for agent integration
+- **MCP server** — Model Context Protocol server for LLM tool-use
+- **Block explorer** — Dark-themed web SPA for chain inspection
 - **P2P networking** — WebSocket-based gossip protocol with message deduplication
+- **Persistent storage** — sled embedded database for durable state
 
 ## Architecture
 
@@ -20,9 +27,17 @@ crates/
 ├── baud-core        # Crypto, types, state machine, mempool, error types
 ├── baud-consensus   # BFT consensus engine with round-robin leader rotation
 ├── baud-network     # P2P WebSocket networking with gossip protocol
-├── baud-api         # Axum REST API server
+├── baud-api         # Axum REST API server with rate limiting
 ├── baud-cli         # Headless CLI for key management and transaction signing
+├── baud-wallet      # AES-256-GCM encrypted wallet with Argon2id key derivation
+├── baud-storage     # Persistent storage layer (sled)
 └── baud-node        # Full node binary wiring all subsystems together
+
+sdk/python/          # Python SDK (baud_sdk) with BaudPay payment wrappers
+mcp-server/          # Model Context Protocol server for LLM integration
+docs/                # Whitepaper, block explorer, landing page
+examples/            # LangChain, CrewAI, and autonomous agent templates
+scripts/             # Testnet launcher (PowerShell)
 ```
 
 ### Cryptography
@@ -61,7 +76,7 @@ cargo build --release
 cargo test
 ```
 
-31 tests across unit and integration suites covering crypto, state transitions, escrow lifecycle, mempool, consensus, overflow protection, and replay resistance.
+36 tests across unit and integration suites covering crypto, state transitions, escrow lifecycle, mempool, consensus, wallet encryption, overflow protection, and replay/cross-chain attack resistance.
 
 ## CLI Usage
 
@@ -82,7 +97,8 @@ baud transfer \
   --secret <hex-secret-key> \
   --to <hex-recipient-address> \
   --amount 1000000000000000000 \
-  --nonce 0
+  --nonce 0 \
+  --chain-id baud-mainnet
 ```
 
 Prints a signed transaction as JSON to stdout.
@@ -192,8 +208,9 @@ baud genesis --validators <key1>,<key2>,<key3> --output genesis.json
 baud-node \
   --genesis genesis.json \
   --secret-key <validator-hex-secret> \
-  --listen-addr 0.0.0.0:9000 \
-  --api-port 8080
+  --api-addr 0.0.0.0:8080 \
+  --p2p-addr 0.0.0.0:9944 \
+  --peers ws://127.0.0.1:9945
 ```
 
 ### Node Configuration
@@ -202,19 +219,80 @@ baud-node \
 |------|---------|-------------|
 | `--genesis` | required | Path to genesis.json |
 | `--secret-key` | required | Hex-encoded validator secret key |
-| `--listen-addr` | `0.0.0.0:9000` | P2P listen address |
-| `--api-port` | `8080` | REST API port |
-| `--bootstrap` | none | Comma-separated peer addresses to connect to |
+| `--api-addr` | `0.0.0.0:8080` | REST API listen address |
+| `--p2p-addr` | `0.0.0.0:9944` | P2P WebSocket listen address |
+| `--peers` | none | Comma-separated peer WebSocket URLs |
+| `--data-dir` | `data/` | Persistent storage directory |
+| `--block-interval` | `5000` | Block interval in milliseconds |
 
 ## Security Model
 
 - **Ed25519 signatures** on every transaction; replay-protected by sequential nonces
+- **Cross-chain replay protection** — chain ID included in signed transaction hash
 - **Checked arithmetic** (`u128` overflow/underflow prevention) on all balance mutations
 - **Structural validation** — size limits, self-transfer rejection, zero-amount rejection
 - **Escrow authorization** — only recipient can release (with valid preimage), only sender can refund (after deadline)
+- **Encrypted wallets** — AES-256-GCM encryption with Argon2id KDF (64 MiB, 3 iterations)
+- **Rate limiting** — Token-bucket rate limiter on API (60 burst, 20/s sustained)
 - **CORS + body limits** (128 KiB) on the API layer
 - **Message deduplication** in P2P gossip to prevent amplification
+- **Constant-time signature verification** via `ed25519-dalek`
 - **Deterministic state root** — sorted account hashes for Merkle-proof readiness
+
+## Python SDK
+
+```bash
+pip install -e sdk/python/
+```
+
+```python
+from baud_sdk import BaudClient, BaudPay
+
+# Low-level client
+client = BaudClient("http://localhost:8080")
+status = client.status()
+
+# High-level payment wrapper for agents
+pay = BaudPay.from_secret("hex-secret-key", node="http://localhost:8080")
+receipt = pay.send(to="hex-address", amount_baud=1.0, memo="service payment")
+receipt = pay.escrow(recipient="hex-address", amount_baud=5.0, preimage="secret")
+print(pay.balance())
+```
+
+## Agent Templates
+
+Ready-to-use examples in `examples/`:
+
+- **`langchain_agent.py`** — LangChain tools for balance, send, and escrow
+- **`crewai_team.py`** — CrewAI buyer/seller team with automated payment flow
+- **`autonomous_agent.py`** — Minimal standalone agent with identity management
+
+## Block Explorer
+
+Open `docs/explorer.html` in a browser. Connects to a local node and displays:
+- Chain stats (height, accounts, escrows, mempool size)
+- Account and escrow lookup by address/ID
+- Live mempool view with auto-refresh
+
+## Testnet
+
+Launch a local multi-node testnet:
+
+```powershell
+# Start 3-node testnet
+.\scripts\testnet.ps1 -Nodes 3
+
+# Stop all nodes
+.\scripts\testnet.ps1 -Stop
+```
+
+## Benchmarks
+
+```bash
+cargo bench -p baud-core
+```
+
+8 Criterion benchmarks: keygen, sign, validate, apply, 1000-tx batch, state root, mempool, BLAKE3.
 
 ## License
 

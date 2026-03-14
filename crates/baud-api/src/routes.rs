@@ -42,6 +42,7 @@ pub struct SubmitTxRequest {
     pub nonce: u64,
     pub payload: TxPayloadDto,
     pub timestamp: u64,
+    pub chain_id: String,
     pub signature: String,
 }
 
@@ -562,6 +563,7 @@ fn parse_tx_request(
         nonce: req.nonce,
         payload,
         timestamp: req.timestamp,
+        chain_id: req.chain_id,
         signature,
     })
 }

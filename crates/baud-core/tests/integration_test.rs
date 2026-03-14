@@ -149,7 +149,7 @@ fn replay_protection() {
     let alice = KeyPair::generate();
     let bob = KeyPair::generate();
 
-    let mut state = WorldState::new("test".into());
+    let mut state = WorldState::new("baud-test".into());
     state.accounts.insert(
         alice.address(),
         Account::with_balance(alice.address(), 10_000),
@@ -188,7 +188,7 @@ fn escrow_refund_before_deadline_fails() {
     let alice = KeyPair::generate();
     let bob = KeyPair::generate();
 
-    let mut state = WorldState::new("test".into());
+    let mut state = WorldState::new("baud-test".into());
     state.accounts.insert(
         alice.address(),
         Account::with_balance(alice.address(), 10_000),
@@ -215,7 +215,7 @@ fn escrow_wrong_preimage_fails() {
     let alice = KeyPair::generate();
     let bob = KeyPair::generate();
 
-    let mut state = WorldState::new("test".into());
+    let mut state = WorldState::new("baud-test".into());
     state.accounts.insert(
         alice.address(),
         Account::with_balance(alice.address(), 10_000),
@@ -244,7 +244,7 @@ fn escrow_unauthorized_release() {
     let bob = KeyPair::generate();
     let mallory = KeyPair::generate();
 
-    let mut state = WorldState::new("test".into());
+    let mut state = WorldState::new("baud-test".into());
     state.accounts.insert(
         alice.address(),
         Account::with_balance(alice.address(), 10_000),
@@ -302,7 +302,7 @@ fn balance_overflow_protection() {
     let alice = KeyPair::generate();
     let bob = KeyPair::generate();
 
-    let mut state = WorldState::new("test".into());
+    let mut state = WorldState::new("baud-test".into());
     state.accounts.insert(
         alice.address(),
         Account::with_balance(alice.address(), u128::MAX),
@@ -336,6 +336,7 @@ fn sign_transfer(
             memo: None,
         },
         timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
         signature: Signature::zero(),
     };
     let h = tx.signable_hash();
@@ -361,6 +362,7 @@ fn sign_escrow_create(
             deadline,
         },
         timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
         signature: Signature::zero(),
     };
     let h = tx.signable_hash();
@@ -382,6 +384,7 @@ fn sign_escrow_release(
             preimage: preimage.to_vec(),
         },
         timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
         signature: Signature::zero(),
     };
     let h = tx.signable_hash();
@@ -399,6 +402,7 @@ fn sign_escrow_refund(
         nonce,
         payload: TxPayload::EscrowRefund { escrow_id },
         timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
         signature: Signature::zero(),
     };
     let h = tx.signable_hash();
@@ -425,6 +429,7 @@ fn sign_agent_register(
                 .collect(),
         },
         timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
         signature: Signature::zero(),
     };
     let h = tx.signable_hash();

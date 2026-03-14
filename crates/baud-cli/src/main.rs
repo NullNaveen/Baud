@@ -49,6 +49,9 @@ enum Commands {
         /// Optional text memo.
         #[arg(long)]
         memo: Option<String>,
+        /// Chain identifier (must match the target chain).
+        #[arg(long, default_value = "baud-mainnet")]
+        chain_id: String,
     },
 
     /// Create a signed escrow-create transaction and print it as JSON.
@@ -71,6 +74,9 @@ enum Commands {
         /// Sender nonce.
         #[arg(long)]
         nonce: u64,
+        /// Chain identifier (must match the target chain).
+        #[arg(long, default_value = "baud-mainnet")]
+        chain_id: String,
     },
 
     /// Create a signed escrow-release transaction and print it as JSON.
@@ -87,6 +93,9 @@ enum Commands {
         /// Sender nonce.
         #[arg(long)]
         nonce: u64,
+        /// Chain identifier (must match the target chain).
+        #[arg(long, default_value = "baud-mainnet")]
+        chain_id: String,
     },
 
     /// Create a signed escrow-refund transaction and print it as JSON.
@@ -100,6 +109,9 @@ enum Commands {
         /// Sender nonce.
         #[arg(long)]
         nonce: u64,
+        /// Chain identifier (must match the target chain).
+        #[arg(long, default_value = "baud-mainnet")]
+        chain_id: String,
     },
 
     /// Create a signed agent-register transaction and print it as JSON.
@@ -119,6 +131,9 @@ enum Commands {
         /// Sender nonce.
         #[arg(long)]
         nonce: u64,
+        /// Chain identifier (must match the target chain).
+        #[arg(long, default_value = "baud-mainnet")]
+        chain_id: String,
     },
 
     /// Generate a genesis configuration file.
@@ -266,6 +281,7 @@ fn main() -> Result<()> {
             amount,
             nonce,
             memo,
+            chain_id,
         } => {
             let kp = KeyPair::from_secret_hex(&secret).context("invalid secret key")?;
             let to_addr = Address::from_hex(&to).context("invalid recipient address")?;
@@ -280,6 +296,7 @@ fn main() -> Result<()> {
                     memo: memo.map(|m| m.into_bytes()),
                 },
                 timestamp: now_ms(),
+                chain_id,
                 signature: Signature::zero(),
             };
             sign_tx(&kp, &mut tx);
@@ -307,6 +324,7 @@ fn main() -> Result<()> {
             preimage,
             deadline,
             nonce,
+            chain_id,
         } => {
             let kp = KeyPair::from_secret_hex(&secret).context("invalid secret key")?;
             let recipient_addr =
@@ -323,6 +341,7 @@ fn main() -> Result<()> {
                     deadline,
                 },
                 timestamp: now_ms(),
+                chain_id,
                 signature: Signature::zero(),
             };
             sign_tx(&kp, &mut tx);
@@ -350,6 +369,7 @@ fn main() -> Result<()> {
             escrow_id,
             preimage,
             nonce,
+            chain_id,
         } => {
             let kp = KeyPair::from_secret_hex(&secret).context("invalid secret key")?;
             let eid = Hash::from_hex(&escrow_id).context("invalid escrow ID")?;
@@ -362,6 +382,7 @@ fn main() -> Result<()> {
                     preimage: preimage.into_bytes(),
                 },
                 timestamp: now_ms(),
+                chain_id,
                 signature: Signature::zero(),
             };
             sign_tx(&kp, &mut tx);
@@ -384,6 +405,7 @@ fn main() -> Result<()> {
             secret,
             escrow_id,
             nonce,
+            chain_id,
         } => {
             let kp = KeyPair::from_secret_hex(&secret).context("invalid secret key")?;
             let eid = Hash::from_hex(&escrow_id).context("invalid escrow ID")?;
@@ -393,6 +415,7 @@ fn main() -> Result<()> {
                 nonce,
                 payload: TxPayload::EscrowRefund { escrow_id: eid },
                 timestamp: now_ms(),
+                chain_id,
                 signature: Signature::zero(),
             };
             sign_tx(&kp, &mut tx);
@@ -417,6 +440,7 @@ fn main() -> Result<()> {
             endpoint,
             capabilities,
             nonce,
+            chain_id,
         } => {
             let kp = KeyPair::from_secret_hex(&secret).context("invalid secret key")?;
             let caps: Vec<Vec<u8>> = capabilities
@@ -433,6 +457,7 @@ fn main() -> Result<()> {
                     capabilities: caps,
                 },
                 timestamp: now_ms(),
+                chain_id,
                 signature: Signature::zero(),
             };
             sign_tx(&kp, &mut tx);

@@ -140,6 +140,7 @@ mod tests {
             nonce,
             payload,
             timestamp: ts,
+            chain_id: "test".into(),
             signature: BaudSignature::zero(),
         };
         let h = tx.signable_hash();

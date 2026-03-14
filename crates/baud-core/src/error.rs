@@ -38,6 +38,9 @@ pub enum BaudError {
     #[error("transaction too large: {size} bytes exceeds max {max} bytes")]
     TransactionTooLarge { size: usize, max: usize },
 
+    #[error("chain ID mismatch: expected {expected}, got {got}")]
+    ChainIdMismatch { expected: String, got: String },
+
     // ── Escrow ──────────────────────────────────────────────────────
     #[error("escrow not found: {0}")]
     EscrowNotFound(String),

@@ -25,6 +25,7 @@ fn make_signed_transfer(kp: &KeyPair, to: &baud_core::crypto::Address, amount: u
         nonce,
         payload: TxPayload::Transfer { to: *to, amount, memo: None },
         timestamp: now_ms(),
+        chain_id: "bench".into(),
         signature: Signature::zero(),
     };
     let hash = tx.signable_hash();

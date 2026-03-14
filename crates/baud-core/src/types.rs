@@ -24,6 +24,8 @@ pub struct Transaction {
     pub payload: TxPayload,
     /// Unix-millisecond timestamp. Nodes reject txs too far in the future.
     pub timestamp: u64,
+    /// Chain identifier — prevents cross-chain replay attacks.
+    pub chain_id: String,
     /// Ed25519 signature over the canonical hash of the above fields.
     pub signature: Signature,
 }
@@ -89,6 +91,7 @@ impl Transaction {
             &self.nonce,
             &self.payload,
             &self.timestamp,
+            &self.chain_id,
         ))
         .expect("serialization of tx fields should never fail");
         Hash::digest(&payload_bytes)

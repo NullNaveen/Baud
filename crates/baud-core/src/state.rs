@@ -92,7 +92,15 @@ impl WorldState {
         // 1. Structural validation
         tx.validate_structure()?;
 
-        // 2. Reject transactions too far in the future (30 seconds tolerance).
+        // 2. Chain ID must match (prevents cross-chain replay attacks).
+        if tx.chain_id != self.chain_id {
+            return Err(BaudError::ChainIdMismatch {
+                expected: self.chain_id.clone(),
+                got: tx.chain_id.clone(),
+            });
+        }
+
+        // 3. Reject transactions too far in the future (30 seconds tolerance).
         if tx.timestamp > current_time.saturating_add(30_000) {
             return Err(BaudError::TransactionExpired(tx.timestamp));
         }
@@ -400,6 +408,7 @@ mod tests {
             nonce,
             payload,
             timestamp,
+            chain_id: "test".into(),
             signature: crate::crypto::Signature::zero(),
         };
         let hash = tx.signable_hash();
@@ -484,6 +493,7 @@ mod tests {
             nonce: 0,
             payload: create_payload,
             timestamp: 1_000_000,
+            chain_id: "test".into(),
             signature: crate::crypto::Signature::zero(),
         };
         let h = create_tx.signable_hash();
@@ -509,6 +519,7 @@ mod tests {
             nonce: 0,
             payload: release_payload,
             timestamp: 1_500_000,
+            chain_id: "test".into(),
             signature: crate::crypto::Signature::zero(),
         };
         let h = release_tx.signable_hash();
@@ -553,6 +564,7 @@ mod tests {
             nonce: 0,
             payload: create_payload,
             timestamp: 1_000_000,
+            chain_id: "test".into(),
             signature: crate::crypto::Signature::zero(),
         };
         let h = create_tx.signable_hash();
@@ -568,6 +580,7 @@ mod tests {
             nonce: 1,
             payload: refund_payload,
             timestamp: 3_000_000,
+            chain_id: "test".into(),
             signature: crate::crypto::Signature::zero(),
         };
         let h = refund_tx.signable_hash();
