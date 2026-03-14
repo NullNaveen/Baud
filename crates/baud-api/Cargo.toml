@@ -18,3 +18,4 @@ serde_json.workspace = true
 thiserror.workspace = true
 parking_lot.workspace = true
 hex.workspace = true
+dashmap.workspace = true

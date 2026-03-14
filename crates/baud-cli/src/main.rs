@@ -10,6 +10,7 @@ use baud_core::types::{
     GenesisAllocation, GenesisConfig, Transaction, TxPayload, ValidatorInfo,
     QUANTA_PER_BAUD,
 };
+use baud_wallet::EncryptedWallet;
 
 /// Baud — CLI for the M2M Agent Ledger
 #[derive(Parser)]
@@ -169,6 +170,58 @@ enum Commands {
         #[arg(long, default_value = "http://localhost:8080")]
         node: String,
     },
+
+    /// Create a new encrypted wallet file with a fresh keypair.
+    WalletCreate {
+        /// Path to the wallet file.
+        #[arg(long, default_value = "wallet.json")]
+        wallet: String,
+        /// Password for encryption.
+        #[arg(long)]
+        password: String,
+        /// Label for the initial key.
+        #[arg(long, default_value = "default")]
+        label: String,
+    },
+
+    /// Import an existing secret key into an encrypted wallet.
+    WalletImport {
+        /// Path to the wallet file.
+        #[arg(long, default_value = "wallet.json")]
+        wallet: String,
+        /// Password for encryption.
+        #[arg(long)]
+        password: String,
+        /// Label for the key.
+        #[arg(long)]
+        label: String,
+        /// Hex-encoded secret key to import.
+        #[arg(long)]
+        secret: String,
+    },
+
+    /// List all keys in an encrypted wallet (addresses only).
+    WalletList {
+        /// Path to the wallet file.
+        #[arg(long, default_value = "wallet.json")]
+        wallet: String,
+        /// Password for decryption.
+        #[arg(long)]
+        password: String,
+    },
+
+    /// Export the secret key for a specific label from the wallet.
+    WalletExport {
+        /// Path to the wallet file.
+        #[arg(long, default_value = "wallet.json")]
+        wallet: String,
+        /// Password for decryption.
+        #[arg(long)]
+        password: String,
+        /// Label of the key to export.
+        #[arg(long)]
+        label: String,
+    },
 }
 
 fn now_ms() -> u64 {
@@ -216,6 +269,7 @@ fn main() -> Result<()> {
         } => {
             let kp = KeyPair::from_secret_hex(&secret).context("invalid secret key")?;
             let to_addr = Address::from_hex(&to).context("invalid recipient address")?;
+            let memo_clone = memo.clone();
 
             let mut tx = Transaction {
                 sender: kp.address(),
@@ -237,7 +291,7 @@ fn main() -> Result<()> {
                     "type": "Transfer",
                     "to": to,
                     "amount": amount,
-                    "memo": tx.signature.to_hex(), // memo handled in payload
+                    "memo": memo_clone,
                 },
                 "timestamp": tx.timestamp,
                 "signature": tx.signature.to_hex(),
@@ -495,6 +549,66 @@ fn main() -> Result<()> {
                 println!("{body}");
                 Ok::<(), anyhow::Error>(())
             })?;
+        }
+
+        Commands::WalletCreate {
+            wallet,
+            password,
+            label,
+        } => {
+            let w = EncryptedWallet::at(&wallet);
+            let entry = w.create(&password, &label)?;
+            let output = json!({
+                "created": wallet,
+                "label": entry.label,
+                "address": entry.address,
+            });
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        }
+
+        Commands::WalletImport {
+            wallet,
+            password,
+            label,
+            secret,
+        } => {
+            let w = EncryptedWallet::at(&wallet);
+            let entry = w.import_key(&password, &label, &secret)?;
+            let output = json!({
+                "imported": label,
+                "address": entry.address,
+            });
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        }
+
+        Commands::WalletList { wallet, password } => {
+            let w = EncryptedWallet::at(&wallet);
+            let entries = w.list(&password)?;
+            let output: Vec<_> = entries
+                .iter()
+                .map(|e| {
+                    json!({
+                        "label": e.label,
+                        "address": e.address,
+                    })
+                })
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        }
+
+        Commands::WalletExport {
+            wallet,
+            password,
+            label,
+        } => {
+            let w = EncryptedWallet::at(&wallet);
+            let entry = w.export(&password, &label)?;
+            let output = json!({
+                "label": entry.label,
+                "address": entry.address,
+                "secret_key": entry.secret_key,
+            });
+            println!("{}", serde_json::to_string_pretty(&output)?);
         }
     }
 

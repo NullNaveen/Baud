@@ -1,18 +1,22 @@
+use std::net::IpAddr;
 use std::sync::Arc;
+use std::time::Instant;
 
 use axum::{
-    extract::{Path, State},
+    extract::{ConnectInfo, Path, State},
     http::StatusCode,
+    middleware::{self, Next},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
+use dashmap::DashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
-use tracing::info;
+use tracing::{info, warn};
 
 use baud_core::crypto::{Address, Hash, Signature};
 use baud_core::mempool::Mempool;
@@ -146,9 +150,90 @@ pub struct ErrorResponse {
     pub error: String,
 }
 
+// ─── Rate Limiter ───────────────────────────────────────────────────────────
+
+/// Token-bucket rate limiter keyed by IP address.
+#[derive(Clone)]
+pub struct RateLimiter {
+    /// Map from IP → (tokens remaining, last refill instant).
+    buckets: Arc<DashMap<IpAddr, (f64, Instant)>>,
+    /// Maximum tokens (burst capacity).
+    pub max_tokens: f64,
+    /// Tokens added per second.
+    pub refill_rate: f64,
+}
+
+impl RateLimiter {
+    /// Create a new rate limiter.
+    /// `max_tokens` = burst size, `refill_rate` = requests/second steady state.
+    pub fn new(max_tokens: f64, refill_rate: f64) -> Self {
+        Self {
+            buckets: Arc::new(DashMap::new()),
+            max_tokens,
+            refill_rate,
+        }
+    }
+
+    /// Try to consume one token for the given IP.
+    /// Returns `true` if allowed, `false` if rate-limited.
+    fn try_acquire(&self, ip: IpAddr) -> bool {
+        let now = Instant::now();
+        let mut entry = self
+            .buckets
+            .entry(ip)
+            .or_insert((self.max_tokens, now));
+
+        let (tokens, last_refill) = entry.value_mut();
+        let elapsed = now.duration_since(*last_refill).as_secs_f64();
+        *tokens = (*tokens + elapsed * self.refill_rate).min(self.max_tokens);
+        *last_refill = now;
+
+        if *tokens >= 1.0 {
+            *tokens -= 1.0;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// Axum middleware that rejects requests exceeding the rate limit.
+/// Note: Uses the direct TCP connection IP (ConnectInfo). If behind a
+/// reverse proxy, configure the proxy to set ConnectInfo correctly.
+async fn rate_limit_middleware(
+    State(limiter): State<RateLimiter>,
+    req: axum::extract::Request,
+    next: Next,
+) -> impl IntoResponse {
+    // Extract client IP from direct TCP connection.
+    let ip = req
+        .extensions()
+        .get::<ConnectInfo<std::net::SocketAddr>>()
+        .map(|ci| ci.0.ip())
+        .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+
+    if limiter.try_acquire(ip) {
+        next.run(req).await.into_response()
+    } else {
+        warn!(%ip, "rate limited");
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(ErrorResponse {
+                error: "rate limit exceeded — try again shortly".into(),
+            }),
+        )
+            .into_response()
+    }
+}
+
 // ─── Router ─────────────────────────────────────────────────────────────────
 
 pub fn build_router(state: AppState) -> Router {
+    build_router_with_rate_limit(state, RateLimiter::new(60.0, 20.0))
+}
+
+/// Build the router with a custom rate limiter (useful for tests).
+pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Router {
     Router::new()
         .route("/status", get(get_status))
         .route("/account/{address}", get(get_account))
@@ -157,6 +242,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/escrow/{id}", get(get_escrow))
         .route("/mempool", get(get_mempool))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
+        .layer(middleware::from_fn_with_state(limiter, rate_limit_middleware))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state)

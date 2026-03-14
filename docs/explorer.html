@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baud Block Explorer</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header */
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 0; }
+  header .inner { display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 20px; font-weight: 600; }
+  header h1 span { color: var(--accent); }
+  .node-input { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .node-input label { color: var(--dim); font-size: 13px; }
+  .node-input input { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 4px 10px; border-radius: 6px; font-size: 13px; width: 240px; }
+  .node-input button { background: var(--accent); color: #fff; border: none; padding: 5px 14px;
+    border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
+
+  /* Stats bar */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin: 24px 0; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .stat-card .label { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab { padding: 10px 20px; cursor: pointer; color: var(--dim); font-size: 14px; font-weight: 500;
+    border-bottom: 2px solid transparent; transition: all .15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Search */
+  .search-bar { display: flex; gap: 8px; margin-bottom: 20px; }
+  .search-bar input { flex: 1; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+  .search-bar button { background: var(--accent); color: #fff; border: none; padding: 10px 20px;
+    border-radius: 8px; cursor: pointer; font-weight: 500; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: var(--dim); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  tr:hover td { background: rgba(88,166,255,0.04); }
+
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+  .truncated { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+
+  /* Detail card */
+  .detail-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 20px; margin-bottom: 20px; }
+  .detail-card h3 { font-size: 16px; margin-bottom: 12px; color: var(--accent); }
+  .detail-row { display: flex; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .detail-row:last-child { border: none; }
+  .detail-key { width: 160px; color: var(--dim); font-size: 13px; flex-shrink: 0; }
+  .detail-val { font-size: 13px; word-break: break-all; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 500; }
+  .badge-active { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-pending { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .badge-released { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .badge-refunded { background: rgba(248,81,73,0.15); color: var(--red); }
+
+  .empty-state { text-align: center; padding: 40px; color: var(--dim); }
+  .error-banner { background: rgba(248,81,73,0.1); border: 1px solid var(--red); color: var(--red);
+    padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; display: none; }
+
+  @media (max-width: 600px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .node-input { flex-direction: column; align-items: flex-end; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container inner">
+    <h1>⚡ <span>Baud</span> Explorer</h1>
+    <div class="node-input">
+      <label>Node:</label>
+      <input id="nodeUrl" value="http://localhost:8080" placeholder="http://host:port">
+      <button onclick="refreshAll()">Connect</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Error banner -->
+  <div class="error-banner" id="errorBanner"></div>
+
+  <!-- Stats -->
+  <div class="stats" id="statsGrid">
+    <div class="stat-card"><div class="label">Height</div><div class="value" id="statHeight">—</div></div>
+    <div class="stat-card"><div class="label">Accounts</div><div class="value" id="statAccounts">—</div></div>
+    <div class="stat-card"><div class="label">Escrows</div><div class="value" id="statEscrows">—</div></div>
+    <div class="stat-card"><div class="label">Mempool</div><div class="value" id="statMempool">—</div></div>
+    <div class="stat-card"><div class="label">Uptime</div><div class="value" id="statUptime">—</div></div>
+    <div class="stat-card"><div class="label">Chain ID</div><div class="value" id="statChain" style="font-size:14px">—</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="search">Search</div>
+    <div class="tab" data-tab="mempool">Mempool</div>
+  </div>
+
+  <!-- Search panel -->
+  <div class="panel active" id="panel-search">
+    <div class="search-bar">
+      <input id="searchInput" placeholder="Enter address (hex) or escrow ID..." onkeydown="if(event.key==='Enter')doSearch()">
+      <button onclick="doSearch()">Search</button>
+    </div>
+    <div id="searchResults"></div>
+  </div>
+
+  <!-- Mempool panel -->
+  <div class="panel" id="panel-mempool">
+    <div id="mempoolContent"><div class="empty-state">Loading mempool...</div></div>
+  </div>
+
+</div>
+
+<script>
+function node() { return document.getElementById('nodeUrl').value.replace(/\/+$/, ''); }
+
+function showError(msg) {
+  const b = document.getElementById('errorBanner');
+  b.textContent = msg; b.style.display = 'block';
+  setTimeout(() => b.style.display = 'none', 8000);
+}
+
+async function api(path) {
+  const resp = await fetch(node() + path);
+  if (!resp.ok) { const e = await resp.json().catch(() => ({ error: resp.statusText })); throw new Error(e.error || resp.statusText); }
+  return resp.json();
+}
+
+function trunc(s, n=16) { return s && s.length > n*2 ? s.slice(0,n) + '…' + s.slice(-n) : s; }
+
+function formatUptime(ms) {
+  const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60), d = Math.floor(h/24);
+  if (d > 0) return d + 'd ' + (h%24) + 'h';
+  if (h > 0) return h + 'h ' + (m%60) + 'm';
+  if (m > 0) return m + 'm ' + (s%60) + 's';
+  return s + 's';
+}
+
+// Refresh status
+async function refreshStatus() {
+  try {
+    const s = await api('/status');
+    document.getElementById('statHeight').textContent = s.height.toLocaleString();
+    document.getElementById('statAccounts').textContent = s.accounts.toLocaleString();
+    document.getElementById('statEscrows').textContent = s.escrows.toLocaleString();
+    document.getElementById('statMempool').textContent = s.mempool_size.toLocaleString();
+    document.getElementById('statUptime').textContent = formatUptime(s.uptime_ms);
+    document.getElementById('statChain').textContent = s.chain_id;
+  } catch(e) { showError('Cannot reach node: ' + e.message); }
+}
+
+// Mempool
+async function refreshMempool() {
+  try {
+    const m = await api('/mempool');
+    const el = document.getElementById('mempoolContent');
+    if (m.transactions.length === 0) {
+      el.innerHTML = '<div class="empty-state">No pending transactions</div>';
+      return;
+    }
+    let html = '<table><thead><tr><th>Hash</th><th>Sender</th><th>Nonce</th><th>Time</th></tr></thead><tbody>';
+    for (const tx of m.transactions) {
+      html += `<tr>
+        <td class="mono"><span class="truncated">${tx.hash}</span></td>
+        <td class="mono"><a href="#" onclick="searchAccount('${tx.sender}');return false"><span class="truncated">${tx.sender}</span></a></td>
+        <td>${tx.nonce}</td>
+        <td>${new Date(tx.timestamp).toLocaleTimeString()}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    el.innerHTML = `<p style="color:var(--dim);margin-bottom:12px">${m.pending_count} pending transaction(s)</p>` + html;
+  } catch(e) { showError('Mempool error: ' + e.message); }
+}
+
+function refreshAll() { refreshStatus(); refreshMempool(); }
+
+// Search
+async function doSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) return;
+  const el = document.getElementById('searchResults');
+  el.innerHTML = '<div class="empty-state">Searching...</div>';
+
+  // Try account first
+  try {
+    const acc = await api('/account/' + encodeURIComponent(q));
+    let html = '<div class="detail-card"><h3>Account</h3>';
+    html += detailRow('Address', acc.address);
+    html += detailRow('Balance', formatBalance(acc.balance) + ' BAUD');
+    html += detailRow('Nonce', acc.nonce);
+    if (acc.agent_meta) {
+      html += detailRow('Agent Name', acc.agent_meta.name);
+      html += detailRow('Endpoint', acc.agent_meta.endpoint);
+      html += detailRow('Capabilities', acc.agent_meta.capabilities.join(', '));
+    }
+    html += '</div>';
+    el.innerHTML = html;
+    return;
+  } catch(_) { /* not an account, try escrow */ }
+
+  try {
+    const esc = await api('/escrow/' + encodeURIComponent(q));
+    let html = '<div class="detail-card"><h3>Escrow</h3>';
+    html += detailRow('ID', esc.id);
+    html += detailRow('Sender', `<a href="#" onclick="searchAccount('${esc.sender}');return false">${esc.sender}</a>`);
+    html += detailRow('Recipient', `<a href="#" onclick="searchAccount('${esc.recipient}');return false">${esc.recipient}</a>`);
+    html += detailRow('Amount', formatBalance(esc.amount) + ' BAUD');
+    html += detailRow('Hash Lock', esc.hash_lock);
+    html += detailRow('Deadline', new Date(esc.deadline).toLocaleString());
+    html += detailRow('Status', badgeFor(esc.status));
+    html += detailRow('Created at Block', esc.created_at_height);
+    html += '</div>';
+    el.innerHTML = html;
+    return;
+  } catch(_) { /* not found */ }
+
+  el.innerHTML = '<div class="empty-state">No account or escrow found for that query.</div>';
+}
+
+function searchAccount(addr) {
+  document.getElementById('searchInput').value = addr;
+  switchTab('search');
+  doSearch();
+}
+
+function formatBalance(raw) {
+  const s = String(raw);
+  const QUANTA = 18;
+  if (s.length <= QUANTA) return '0.' + s.padStart(QUANTA, '0').replace(/0+$/, '') || '0';
+  const whole = s.slice(0, s.length - QUANTA);
+  const frac = s.slice(s.length - QUANTA).replace(/0+$/, '');
+  return frac ? whole + '.' + frac : whole;
+}
+
+function detailRow(key, val) {
+  return `<div class="detail-row"><div class="detail-key">${key}</div><div class="detail-val mono">${val}</div></div>`;
+}
+
+function badgeFor(status) {
+  const cls = { active: 'badge-active', released: 'badge-released', refunded: 'badge-refunded', pending: 'badge-pending' };
+  return `<span class="badge ${cls[status] || ''}">${status}</span>`;
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  if (name === 'mempool') refreshMempool();
+}
+
+// Auto-refresh
+refreshAll();
+setInterval(refreshStatus, 5000);
+setInterval(refreshMempool, 10000);
+</script>
+</body>
+</html>

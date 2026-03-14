@@ -1,0 +1,19 @@
+[package]
+name = "baud-wallet"
+version.workspace = true
+edition.workspace = true
+description = "Encrypted wallet storage for Baud agent keys (AES-256-GCM + Argon2)"
+
+[dependencies]
+baud-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+hex.workspace = true
+rand.workspace = true
+thiserror.workspace = true
+aes-gcm.workspace = true
+argon2.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

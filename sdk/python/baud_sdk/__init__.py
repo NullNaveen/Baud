@@ -11,5 +11,6 @@ __version__ = "0.1.0"
 from baud_sdk.client import BaudClient
 from baud_sdk.keys import KeyPair
 from baud_sdk.constants import QUANTA_PER_BAUD
+from baud_sdk.pay import BaudPay, PaymentReceipt
 
-__all__ = ["BaudClient", "KeyPair", "QUANTA_PER_BAUD"]
+__all__ = ["BaudClient", "KeyPair", "QUANTA_PER_BAUD", "BaudPay", "PaymentReceipt"]

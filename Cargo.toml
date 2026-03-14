@@ -8,6 +8,7 @@ members = [
     "crates/baud-cli",
     "crates/baud-node",
     "crates/baud-storage",
+    "crates/baud-wallet",
 ]
 
 [workspace.package]
@@ -69,6 +70,13 @@ baud-consensus = { path = "crates/baud-consensus" }
 baud-network = { path = "crates/baud-network" }
 baud-api = { path = "crates/baud-api" }
 baud-storage = { path = "crates/baud-storage" }
+baud-wallet = { path = "crates/baud-wallet" }
+
+# Wallet encryption
+aes-gcm = "0.10"
+argon2 = "0.5"
+zeroize = { version = "1", features = ["derive"] }
+tempfile = "3"
 
 # Storage
 sled = "0.34"

@@ -10,6 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 baud-core.workspace = true
+baud-wallet.workspace = true
 tokio.workspace = true
 clap.workspace = true
 tracing.workspace = true
