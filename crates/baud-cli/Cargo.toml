@@ -1,0 +1,23 @@
+[package]
+name = "baud-cli"
+version.workspace = true
+edition.workspace = true
+description = "Headless CLI for Baud M2M ledger operations"
+
+[[bin]]
+name = "baud"
+path = "src/main.rs"
+
+[dependencies]
+baud-core.workspace = true
+tokio.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+hex.workspace = true
+rand.workspace = true
+ed25519-dalek.workspace = true
+reqwest = { version = "0.12", features = ["json"] }

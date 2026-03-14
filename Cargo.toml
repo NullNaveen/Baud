@@ -1,0 +1,76 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/baud-core",
+    "crates/baud-consensus",
+    "crates/baud-network",
+    "crates/baud-api",
+    "crates/baud-cli",
+    "crates/baud-node",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Baud Contributors"]
+description = "Ultra-secure Machine-to-Machine ledger for autonomous AI agents"
+
+[workspace.dependencies]
+# Cryptography
+ed25519-dalek = { version = "2", features = ["serde", "rand_core"] }
+blake3 = "1"
+rand = "0.8"
+x25519-dalek = { version = "2", features = ["serde"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode = "1"
+hex = { version = "0.4", features = ["serde"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP / API
+axum = { version = "0.7", features = ["json"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
+hyper = "1"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Concurrency
+dashmap = "6"
+parking_lot = "0.12"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Networking
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+
+# Misc
+thiserror = "1"
+anyhow = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+base64 = "0.22"
+
+# Internal crates
+baud-core = { path = "crates/baud-core" }
+baud-consensus = { path = "crates/baud-consensus" }
+baud-network = { path = "crates/baud-network" }
+baud-api = { path = "crates/baud-api" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

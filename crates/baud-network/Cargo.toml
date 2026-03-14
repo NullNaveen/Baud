@@ -1,0 +1,18 @@
+[package]
+name = "baud-network"
+version.workspace = true
+edition.workspace = true
+description = "P2P networking layer for the Baud M2M ledger"
+
+[dependencies]
+baud-core.workspace = true
+baud-consensus.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+dashmap.workspace = true
+parking_lot.workspace = true
