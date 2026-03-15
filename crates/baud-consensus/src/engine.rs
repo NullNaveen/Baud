@@ -206,6 +206,18 @@ impl ConsensusEngine {
         // Recompute roots with only valid txs.
         let valid_tx_hashes: Vec<Hash> = valid_txs.iter().map(|tx| tx.hash()).collect();
         let final_tx_root = merkle_root(&valid_tx_hashes);
+
+        // Apply block reward to preview state for accurate state root.
+        let reward = baud_core::types::block_reward_at(height);
+        if reward > 0 {
+            let proposer_addr = self.keypair.address();
+            let account = preview_state
+                .accounts
+                .entry(proposer_addr)
+                .or_insert_with(|| baud_core::types::Account::new(proposer_addr));
+            account.balance = account.balance.saturating_add(reward);
+        }
+
         let state_root = preview_state.state_root();
 
         let timestamp = std::time::SystemTime::now()
@@ -333,6 +345,16 @@ impl ConsensusEngine {
                 warn!(tx = %tx.hash(), err = %e, "tx application failed");
                 return false;
             }
+        }
+
+        // Apply block reward to preview state (must match propose_block logic).
+        let reward = baud_core::types::block_reward_at(block.header.height);
+        if reward > 0 {
+            let account = preview
+                .accounts
+                .entry(block.header.proposer)
+                .or_insert_with(|| baud_core::types::Account::new(block.header.proposer));
+            account.balance = account.balance.saturating_add(reward);
         }
 
         // Verify state root.

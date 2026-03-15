@@ -559,6 +559,28 @@ impl WorldState {
             self.apply_transaction(tx)?;
         }
 
+        // ── Mining reward ───────────────────────────────────────────────
+        // Distribute block reward to the proposer (coinbase).
+        let reward = crate::types::block_reward_at(block.header.height);
+        if reward > 0 {
+            let proposer = block.header.proposer;
+            let account = self
+                .accounts
+                .entry(proposer)
+                .or_insert_with(|| Account::new(proposer));
+            account.balance = account
+                .balance
+                .checked_add(reward)
+                .ok_or(BaudError::Overflow)?;
+
+            debug!(
+                height = block.header.height,
+                proposer = %proposer,
+                reward_baud = reward / crate::types::QUANTA_PER_BAUD,
+                "block reward distributed"
+            );
+        }
+
         // Update chain tip.
         self.height = block.header.height;
         self.last_block_hash = block.header.hash();
@@ -575,6 +597,11 @@ impl WorldState {
         }
 
         Ok(())
+    }
+
+    /// Get total mined supply so far.
+    pub fn total_mined(&self) -> Amount {
+        crate::types::total_mined_at(self.height)
     }
 }
 

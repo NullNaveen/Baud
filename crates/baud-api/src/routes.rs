@@ -251,6 +251,7 @@ pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Ro
         .route("/v1/mempool", get(get_mempool))
         .route("/v1/health", get(get_health))
         .route("/v1/metrics", get(get_metrics))
+        .route("/v1/mining", get(get_mining_info))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
         .layer(middleware::from_fn_with_state(
             limiter,
@@ -523,6 +524,46 @@ async fn get_health(State(state): State<AppState>) -> impl IntoResponse {
         "chain_id": state.chain_id,
         "block_height": ws.height,
         "accounts": ws.accounts.len(),
+    }))
+}
+
+/// Mining info endpoint — shows current block reward, halving schedule, supply stats.
+async fn get_mining_info(State(state): State<AppState>) -> impl IntoResponse {
+    use baud_core::types::{
+        block_reward_at, total_mined_at, HALVING_INTERVAL, INITIAL_BLOCK_REWARD, QUANTA_PER_BAUD,
+        TOTAL_SUPPLY_QUANTA,
+    };
+
+    let ws = state.world_state.read();
+    let height = ws.height;
+    let current_reward = block_reward_at(height.saturating_add(1));
+    let total_mined = total_mined_at(height);
+    let era = if height == 0 {
+        0
+    } else {
+        height / HALVING_INTERVAL
+    };
+    let next_halving = (era + 1) * HALVING_INTERVAL;
+    let blocks_until_halving = next_halving.saturating_sub(height);
+    let percent_mined = if TOTAL_SUPPLY_QUANTA > 0 {
+        (total_mined as f64 / TOTAL_SUPPLY_QUANTA as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    Json(serde_json::json!({
+        "block_height": height,
+        "current_block_reward_baud": current_reward / QUANTA_PER_BAUD,
+        "current_block_reward_quanta": current_reward.to_string(),
+        "initial_block_reward_baud": INITIAL_BLOCK_REWARD / QUANTA_PER_BAUD,
+        "halving_interval": HALVING_INTERVAL,
+        "current_era": era,
+        "next_halving_block": next_halving,
+        "blocks_until_halving": blocks_until_halving,
+        "total_mined_baud": total_mined / QUANTA_PER_BAUD,
+        "total_mined_quanta": total_mined.to_string(),
+        "total_supply_baud": TOTAL_SUPPLY_QUANTA / QUANTA_PER_BAUD,
+        "percent_mined": format!("{:.4}", percent_mined),
     }))
 }
 

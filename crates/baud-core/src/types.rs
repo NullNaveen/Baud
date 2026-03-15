@@ -11,11 +11,67 @@ pub type Amount = u128;
 /// 1 BAUD expressed in quanta.
 pub const QUANTA_PER_BAUD: Amount = 1_000_000_000_000_000_000;
 
-/// Total supply: 1 billion BAUD. All tokens exist from genesis; no mining.
+/// Total supply: 1 billion BAUD.
 pub const TOTAL_SUPPLY_BAUD: u64 = 1_000_000_000;
 
 /// Total supply in quanta (1 billion * 10^18).
 pub const TOTAL_SUPPLY_QUANTA: Amount = (TOTAL_SUPPLY_BAUD as u128) * QUANTA_PER_BAUD;
+
+// ─── Mining / block reward ──────────────────────────────────────────────────
+
+/// Initial block reward: 500 BAUD per block (in quanta).
+pub const INITIAL_BLOCK_REWARD: Amount = 500 * QUANTA_PER_BAUD;
+
+/// Number of blocks between each halving (every ~58 days at 5s blocks).
+pub const HALVING_INTERVAL: u64 = 1_000_000;
+
+/// Maximum number of halvings before reward reaches zero.
+/// After 21 halvings, reward < 1 quanta → effectively zero.
+pub const MAX_HALVINGS: u32 = 21;
+
+/// Compute the block reward for a given block height.
+/// Follows Bitcoin's halving model: reward halves every HALVING_INTERVAL blocks.
+pub fn block_reward_at(height: u64) -> Amount {
+    if height == 0 {
+        return 0; // Genesis block has no reward.
+    }
+    let era = height / HALVING_INTERVAL;
+    if era >= MAX_HALVINGS as u64 {
+        return 0;
+    }
+    INITIAL_BLOCK_REWARD >> era as u32
+}
+
+/// Compute total mined supply up to (and including) a given block height.
+pub fn total_mined_at(height: u64) -> Amount {
+    if height == 0 {
+        return 0;
+    }
+    let mut total: Amount = 0;
+    let mut era_start: u64 = 1; // Block 1 is first reward block
+    for era in 0..=MAX_HALVINGS {
+        let reward = INITIAL_BLOCK_REWARD >> era;
+        if reward == 0 {
+            break;
+        }
+        let era_end = (era as u64 + 1) * HALVING_INTERVAL;
+        let blocks_in_era = if height >= era_end {
+            era_end.saturating_sub(era_start)
+        } else {
+            height.saturating_sub(era_start.saturating_sub(1))
+        };
+        total = total.saturating_add(reward.saturating_mul(blocks_in_era as u128));
+        if height < era_end {
+            break;
+        }
+        era_start = era_end;
+    }
+    // Cap at total supply
+    if total > TOTAL_SUPPLY_QUANTA {
+        total = TOTAL_SUPPLY_QUANTA;
+    }
+    total
+}
 
 // ─── Transaction types ──────────────────────────────────────────────────────
 
