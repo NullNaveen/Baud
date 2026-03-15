@@ -94,8 +94,8 @@ The system is composed of six Rust crates organized as a Cargo workspace:
 | Balance type | `u128` (max $3.4 \times 10^{38}$) |
 | Balance arithmetic | Checked (overflow/underflow = rejection) |
 | Transaction fees | 0 |
-| Total supply | 1,000,000,000 BAUD (hard cap enforced at genesis) |
-| Issuance model | Pre-minted at genesis; no mining, no block rewards |
+| Total supply | 1,000,000,000 BAUD (asymptotic hard cap via halving) |
+| Issuance model | Mined via block rewards with Bitcoin-style halving |
 
 The u128 balance type with $10^{18}$ subdivision provides 18 decimal places of precision — matching Ethereum's wei — while the checked arithmetic ensures no balance can overflow or underflow. Zero fees mean agents never need to "top up gas" or estimate fee markets.
 
@@ -308,18 +308,47 @@ Requester                          Worker
 
 ## 9. Economics
 
-### 9.1 Supply
+### 9.1 Supply & Mining
 
-Total supply is hard-capped at **1,000,000,000 BAUD** (1 billion = $10^{27}$ quanta). This cap is enforced in the genesis initialization code — any genesis configuration whose total allocations exceed this limit is rejected. There is no mining, no block rewards, and no inflation mechanism. All tokens exist from the first block.
+Total supply asymptotically approaches **1,000,000,000 BAUD** (1 billion = $10^{27}$ quanta) through a Bitcoin-style halving mechanism. There are no pre-minted tokens and no founder allocation — all BAUD enters circulation through block rewards earned by validators.
+
+#### 9.1.1 Block Reward Schedule
+
+| Era | Block Range | Reward per Block | Era Total | Cumulative Supply |
+|-----|-------------|-----------------|-----------|-------------------|
+| 0 | 1 – 1,000,000 | 500 BAUD | 500,000,000 | 500,000,000 |
+| 1 | 1,000,001 – 2,000,000 | 250 BAUD | 250,000,000 | 750,000,000 |
+| 2 | 2,000,001 – 3,000,000 | 125 BAUD | 125,000,000 | 875,000,000 |
+| 3 | 3,000,001 – 4,000,000 | 62.5 BAUD | 62,500,000 | 937,500,000 |
+| ... | ... | halves each era | ... | approaches 1B |
+| 21 | 21,000,001+ | 0 BAUD | 0 | ~1,000,000,000 |
+
+- **Initial block reward**: 500 BAUD
+- **Halving interval**: Every 1,000,000 blocks (~58 days at 5-second block time)
+- **Maximum halvings**: 21 (after which reward drops to 0)
+- **Mining rate at launch**: ~360,000 BAUD per hour (720 blocks/hr × 500 BAUD)
+
+The geometric series $500M + 250M + 125M + ...$ converges to $500M \times \frac{1}{1 - 0.5} = 1{,}000{,}000{,}000$ BAUD. After 21 halvings, the reward rounds to zero at the quantum level, effectively capping total supply.
+
+#### 9.1.2 Fair Launch
+
+Baud follows the same fair-launch philosophy as Bitcoin:
+
+- **No pre-mine**: Zero tokens exist before the first block is mined.
+- **No founder allocation**: The creator earns BAUD the same way as everyone else — by running a validator.
+- **No ICO/IDO/IEO**: No token sale of any kind.
+- **Permissionless mining**: Anyone can run a validator node and earn block rewards.
 
 ### 9.2 Distribution
 
-| Allocation | Percentage | Purpose |
-|-----------|------------|---------|
-| Founder | 10% | Continued development, infrastructure costs |
-| Validator rewards pool | 20% | Long-term incentives for validators |
-| Agent ecosystem grants | 30% | Grants for agent developers integrating Baud |
-| Initial circulation | 40% | Distributed via testnet participation, early adopters |
+BAUD is distributed entirely through block reward mining. Early validators earn proportionally more due to the halving schedule, creating a natural first-mover incentive similar to Bitcoin's early mining era.
+
+| Phase | Timeline | Mining Rate |
+|-------|----------|-------------|
+| Early adoption | Blocks 1–1M | 500 BAUD/block (360,000/hr) |
+| Growth phase | Blocks 1M–3M | 250→125 BAUD/block |
+| Maturity | Blocks 3M+ | <62.5 BAUD/block, decreasing |
+| Final supply | After era 21 | 0 (all ~1B BAUD mined) |
 
 ### 9.3 Fee Model
 
@@ -327,7 +356,7 @@ Total supply is hard-capped at **1,000,000,000 BAUD** (1 billion = $10^{27}$ qua
 
 - Micro-transactions (fractions of a cent) are the primary use case. Fees would make most transactions uneconomical.
 - Spam prevention is achieved through rate limiting at the API layer rather than economic fee markets.
-- Validators are incentivized through block rewards from the validator rewards pool, not transaction fees.
+- Validators are incentivized through block rewards from mining, not transaction fees.
 
 ### 9.4 Value Proposition
 
@@ -410,7 +439,7 @@ Baud is implemented in Rust for performance, safety, and correctness:
 
 ### Phase 4: Network Launch
 - [ ] Testnet deployment with multiple validators
-- [ ] Genesis ceremony with initial allocation
+- [ ] Genesis ceremony (empty genesis — all BAUD mined via block rewards)
 - [ ] Moltbook and AI agent community announcements
 - [ ] Mainnet launch
 
