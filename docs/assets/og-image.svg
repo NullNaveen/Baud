@@ -6,15 +6,15 @@
       <stop offset="100%" stop-color="#050510"/>
     </linearGradient>
     <linearGradient id="og-logo-bg" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#4f6df5"/>
-      <stop offset="100%" stop-color="#3b52cc"/>
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
     </linearGradient>
     <radialGradient id="og-glow" cx="600" cy="315" r="400" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="rgba(79,109,245,0.12)"/>
+      <stop offset="0%" stop-color="rgba(139,92,246,0.12)"/>
       <stop offset="100%" stop-color="transparent"/>
     </radialGradient>
     <linearGradient id="og-text-grad" x1="400" y1="200" x2="900" y2="450" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#6b85ff"/>
+      <stop offset="0%" stop-color="#a78bfa"/>
       <stop offset="40%" stop-color="#06b6d4"/>
       <stop offset="100%" stop-color="#22c55e"/>
     </linearGradient>
@@ -49,8 +49,8 @@
   <text x="230" y="328" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="28" font-weight="500" fill="url(#og-text-grad)">The Settlement Layer for AI Agent Economies</text>
   <!-- Feature pills -->
   <g transform="translate(230, 365)">
-    <rect width="120" height="36" rx="8" fill="rgba(79,109,245,0.15)" stroke="rgba(79,109,245,0.3)" stroke-width="1"/>
-    <text x="60" y="23" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#6b85ff">Zero Fees</text>
+    <rect width="120" height="36" rx="8" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+    <text x="60" y="23" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#a78bfa">Zero Fees</text>
     <rect x="135" width="160" height="36" rx="8" fill="rgba(34,197,94,0.12)" stroke="rgba(34,197,94,0.25)" stroke-width="1"/>
     <text x="215" y="23" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#22c55e">Bitcoin Mining</text>
     <rect x="310" width="130" height="36" rx="8" fill="rgba(6,182,212,0.12)" stroke="rgba(6,182,212,0.25)" stroke-width="1"/>
