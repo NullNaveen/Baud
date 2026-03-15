@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baud Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0b1a;--bg2:#10102a;--card:#141432;--card-hover:#1a1a3e;
+  --border:#1e1e44;--text:#e8e8f4;--text2:#a0a0b8;--text3:#666680;
+  --primary:#8b5cf6;--primary-light:#a78bfa;--cyan:#06b6d4;--green:#22c55e;
+  --red:#ef4444;--gold:#f5a623;--orange:#f97316;
+  --sidebar-w:240px;--radius:12px;--radius-sm:8px;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+  --gradient:linear-gradient(135deg,#7c3aed,#06b6d4);
+}
+[data-theme="light"]{
+  --bg:#f0f0f6;--bg2:#e8e8f0;--card:#ffffff;--card-hover:#f5f5fa;
+  --border:#d8d8e4;--text:#1a1a2e;--text2:#555570;--text3:#888898;
+  --shadow:0 4px 24px rgba(0,0,0,.08);
+}
+html{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;color:var(--text);background:var(--bg)}
+body{display:flex;min-height:100vh;overflow-x:hidden}
+a{color:var(--primary-light);text-decoration:none}
+a:hover{text-decoration:underline}
+input,select,textarea,button{font-family:inherit;font-size:inherit}
+code,.mono{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:.9em}
+
+/* Sidebar */
+#sidebar{
+  width:var(--sidebar-w);min-height:100vh;background:var(--bg2);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;
+  position:fixed;left:0;top:0;z-index:100;transition:transform .2s;
+}
+#sidebar .logo{
+  padding:24px 20px 16px;display:flex;align-items:center;gap:12px;
+  border-bottom:1px solid var(--border);
+}
+#sidebar .logo svg{width:36px;height:36px;flex-shrink:0}
+#sidebar .logo span{font-size:1.3em;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+#sidebar nav{flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+#sidebar nav a{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-sm);
+  color:var(--text2);transition:all .15s;font-weight:500;font-size:.95em;
+}
+#sidebar nav a:hover{background:var(--card);color:var(--text);text-decoration:none}
+#sidebar nav a.active{background:var(--primary);color:#fff}
+#sidebar nav a.active:hover{background:var(--primary-light)}
+#sidebar nav a svg{width:18px;height:18px;flex-shrink:0;opacity:.7}
+#sidebar nav a.active svg{opacity:1}
+#sidebar .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+
+/* Theme toggle */
+.theme-toggle{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--radius-sm);
+  background:var(--card);border:1px solid var(--border);cursor:pointer;color:var(--text2);
+  font-size:.85em;transition:all .15s;
+}
+.theme-toggle:hover{border-color:var(--primary);color:var(--text)}
+.theme-toggle svg{width:16px;height:16px}
+
+/* Main */
+#main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;padding:24px 32px 48px}
+.page-header{margin-bottom:24px}
+.page-header h1{font-size:1.6em;font-weight:700}
+.page-header p{color:var(--text2);margin-top:4px}
+
+/* Status dot */
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.status-dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+.status-dot.red{background:var(--red);box-shadow:0 0 8px var(--red)}
+.status-dot.gold{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+
+/* Cards */
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;transition:border-color .15s;
+}
+.card:hover{border-color:color-mix(in srgb,var(--primary) 40%,transparent)}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{text-align:center;padding:24px 16px}
+.stat-card .stat-value{font-size:2em;font-weight:700;margin:8px 0 4px;font-variant-numeric:tabular-nums}
+.stat-card .stat-label{color:var(--text2);font-size:.85em;text-transform:uppercase;letter-spacing:.05em}
+.stat-card .stat-sub{color:var(--text3);font-size:.8em;margin-top:4px}
+
+/* Progress bar */
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:8px}
+.progress-bar .fill{height:100%;background:var(--gradient);border-radius:4px;transition:width .5s ease}
+
+/* Tables */
+.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:24px}
+table{width:100%;border-collapse:collapse;background:var(--card)}
+th{text-align:left;padding:12px 16px;font-size:.8em;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);border-bottom:1px solid var(--border);background:var(--bg2)}
+td{padding:12px 16px;border-bottom:1px solid var(--border);font-size:.9em}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--card-hover)}
+
+/* Forms */
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:.85em;font-weight:600;color:var(--text2);margin-bottom:6px}
+.form-group input,.form-group select,.form-group textarea{
+  width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);transition:border-color .15s;
+}
+.form-group input:focus,.form-group textarea:focus{outline:none;border-color:var(--primary)}
+.form-group input::placeholder{color:var(--text3)}
+.form-group .hint{font-size:.78em;color:var(--text3);margin-top:4px}
+
+/* Buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:var(--radius-sm);
+  font-weight:600;border:none;cursor:pointer;transition:all .15s;font-size:.9em;
+}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-light)}
+.btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--primary)}
+.btn-sm{padding:6px 14px;font-size:.82em}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{opacity:.85}
+
+/* Badge */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75em;font-weight:600}
+.badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-gold{background:rgba(245,166,35,.15);color:var(--gold)}
+.badge-cyan{background:rgba(6,182,212,.15);color:var(--cyan)}
+.badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+
+/* Alert */
+.alert{padding:14px 18px;border-radius:var(--radius-sm);marginmargin-bottom:16px;font-size:.9em}
+.alert-success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:var(--green)}
+.alert-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red)}
+.alert-info{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);color:var(--primary-light)}
+
+/* Copy button */
+.copyable{position:relative;cursor:pointer}
+.copyable:hover{opacity:.85}
+.copy-toast{
+  position:fixed;bottom:24px;right:24px;background:var(--green);color:#fff;
+  padding:10px 20px;border-radius:var(--radius-sm);font-size:.85em;font-weight:600;
+  transform:translateY(80px);opacity:0;transition:all .25s;z-index:999;
+}
+.copy-toast.show{transform:translateY(0);opacity:1}
+
+/* JSON viewer */
+.json-view{
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:16px;overflow-x:auto;white-space:pre-wrap;font-family:'SF Mono',Consolas,monospace;
+  font-size:.82em;line-height:1.6;max-height:400px;overflow-y:auto;
+}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:20px;padding-bottom:0}
+.tab{
+  padding:10px 18px;cursor:pointer;color:var(--text2);font-weight:500;font-size:.9em;
+  border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* Responsive */
+#mobile-toggle{display:none;position:fixed;top:12px;left:12px;z-index:200;padding:8px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;color:var(--text)}
+@media(max-width:768px){
+  #sidebar{transform:translateX(-100%)}
+  #sidebar.open{transform:translateX(0)}
+  #main{margin-left:0;padding:16px}
+  #mobile-toggle{display:block}
+  .cards-grid{grid-template-columns:1fr}
+}
+
+/* Skeleton animation */
+.skeleton{background:linear-gradient(90deg,var(--border) 25%,var(--card) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px;height:1.2em;display:inline-block;width:80px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Fade-in for page transitions */
+.page{animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Two-col layout */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:900px){.two-col{grid-template-columns:1fr}}
+
+/* Section */
+.section-title{font-size:1.1em;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* Mining animation */
+@keyframes pulse-glow{0%,100%{box-shadow:0 0 8px var(--green)}50%{box-shadow:0 0 20px var(--green)}}
+.mining-active{animation:pulse-glow 2s infinite}
+</style>
+</head>
+<body>
+
+<button id="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+</button>
+
+<aside id="sidebar">
+  <div class="logo">
+    <svg viewBox="0 0 40 40" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="40" y2="40"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs><rect width="40" height="40" rx="10" fill="url(#lg)"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="20" font-weight="700" fill="#fff" font-family="sans-serif">B</text></svg>
+    <span>Baud</span>
+  </div>
+  <nav id="nav">
+    <a href="#dashboard" data-page="dashboard" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+    <a href="#mining" data-page="mining">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      Mining
+    </a>
+    <a href="#wallet" data-page="wallet">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M16 14h.01M2 10h20"/></svg>
+      Wallet
+    </a>
+    <a href="#send" data-page="send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      Send
+    </a>
+    <a href="#accounts" data-page="accounts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      Accounts
+    </a>
+    <a href="#mempool" data-page="mempool">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>
+      Mempool
+    </a>
+    <a href="#node" data-page="node">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+      Node Info
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div style="display:flex;align-items:center;gap:6px;font-size:.82em;color:var(--text3)">
+      <span class="status-dot green" id="status-dot"></span>
+      <span id="node-status-text">Connected</span>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <svg id="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg id="theme-icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      <span id="theme-label">Light Mode</span>
+    </button>
+  </div>
+</aside>
+
+<main id="main">
+  <div id="content"></div>
+</main>
+
+<div class="copy-toast" id="copy-toast">Copied!</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+const S = {
+  status: null, mining: null, mempool: null, health: null,
+  lastUpdate: 0, connected: false, page: 'dashboard',
+};
+const API = location.origin;
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+function fmt(n) {
+  if (n === undefined || n === null) return '—';
+  return Number(n).toLocaleString();
+}
+
+function fmtBaud(quanta) {
+  if (!quanta) return '0';
+  const b = BigInt(quanta);
+  const whole = b / 1000000n;
+  const frac = b % 1000000n;
+  if (frac === 0n) return whole.toLocaleString();
+  return `${whole.toLocaleString()}.${frac.toString().padStart(6,'0').replace(/0+$/,'')}`;
+}
+
+function fmtUptime(ms) {
+  if (!ms) return '0s';
+  const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60), d = Math.floor(h/24);
+  if (d > 0) return `${d}d ${h%24}h ${m%60}m`;
+  if (h > 0) return `${h}h ${m%60}m ${s%60}s`;
+  if (m > 0) return `${m}m ${s%60}s`;
+  return `${s}s`;
+}
+
+function shortAddr(a) {
+  if (!a || a.length < 16) return a || '';
+  return a.slice(0,8) + '…' + a.slice(-8);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const t = $('#copy-toast');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1500);
+  });
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ─── API Fetchers ───────────────────────────────────────────────────────────
+async function fetchJSON(path) {
+  try {
+    const r = await fetch(API + path);
+    if (!r.ok) throw new Error(r.statusText);
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+async function refreshData() {
+  const [status, mining, mempool, health] = await Promise.all([
+    fetchJSON('/v1/status'),
+    fetchJSON('/v1/mining'),
+    fetchJSON('/v1/mempool'),
+    fetchJSON('/v1/health'),
+  ]);
+  S.status = status;
+  S.mining = mining;
+  S.mempool = mempool;
+  S.health = health;
+  S.connected = !!status;
+  S.lastUpdate = Date.now();
+
+  const dot = $('#status-dot');
+  const txt = $('#node-status-text');
+  if (S.connected) {
+    dot.className = 'status-dot green';
+    txt.textContent = `Block #${fmt(status.height)}`;
+  } else {
+    dot.className = 'status-dot red';
+    txt.textContent = 'Disconnected';
+  }
+
+  renderPage();
+}
+
+// ─── Router ─────────────────────────────────────────────────────────────────
+function navigate(page) {
+  S.page = page;
+  $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+  renderPage();
+}
+
+window.addEventListener('hashchange', () => {
+  const p = location.hash.slice(1) || 'dashboard';
+  navigate(p);
+});
+
+// ─── Theme ──────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+  html.dataset.theme = next;
+  localStorage.setItem('baud-theme', next);
+  updateThemeUI();
+}
+
+function updateThemeUI() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  $('#theme-icon-dark').style.display = dark ? '' : 'none';
+  $('#theme-icon-light').style.display = dark ? 'none' : '';
+  $('#theme-label').textContent = dark ? 'Light Mode' : 'Dark Mode';
+}
+
+// ─── Page Renderers ─────────────────────────────────────────────────────────
+function renderPage() {
+  const c = $('#content');
+  switch(S.page) {
+    case 'dashboard': c.innerHTML = renderDashboard(); break;
+    case 'mining': c.innerHTML = renderMining(); break;
+    case 'wallet': c.innerHTML = renderWallet(); break;
+    case 'send': c.innerHTML = renderSend(); break;
+    case 'accounts': c.innerHTML = renderAccounts(); break;
+    case 'mempool': c.innerHTML = renderMempool(); break;
+    case 'node': c.innerHTML = renderNode(); break;
+    default: c.innerHTML = renderDashboard();
+  }
+}
+
+// ── Dashboard ──
+function renderDashboard() {
+  const s = S.status;
+  const m = S.mining;
+  if (!s) return `<div class="page"><div class="page-header"><h1>Dashboard</h1><p>Connecting to node…</p></div></div>`;
+
+  const rewardBaud = m ? fmt(m.current_block_reward_baud) : '—';
+  const pctMined = m ? parseFloat(m.percent_mined) : 0;
+
+  return `<div class="page">
+    <div class="page-header"><h1>Dashboard</h1><p>Real-time overview of your Baud node</p></div>
+    <div class="cards-grid">
+      <div class="card stat-card">
+        <div class="stat-label">Block Height</div>
+        <div class="stat-value" style="color:var(--primary)">${fmt(s.height)}</div>
+        <div class="stat-sub">${fmtUptime(s.uptime_ms)} uptime</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Block Reward</div>
+        <div class="stat-value" style="color:var(--gold)">${rewardBaud}</div>
+        <div class="stat-sub">BAUD per block</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Total Mined</div>
+        <div class="stat-value" style="color:var(--green)">${m ? fmt(m.total_mined_baud) : '—'}</div>
+        <div class="stat-sub">${pctMined.toFixed(4)}% of supply</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Accounts</div>
+        <div class="stat-value" style="color:var(--cyan)">${fmt(s.accounts)}</div>
+        <div class="stat-sub">${fmt(s.escrows)} escrows</div>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="section-title"><span class="status-dot green mining-active"></span> Mining Progress</div>
+        <div style="display:flex;justify-content:space-between;font-size:.9em;margin-bottom:4px">
+          <span>Era ${m ? m.current_era : 0}</span>
+          <span>${m ? fmt(m.blocks_until_halving) : '—'} blocks to halving</span>
+        </div>
+        <div class="progress-bar"><div class="fill" style="width:${m ? ((1 - m.blocks_until_halving/m.halving_interval)*100) : 0}%"></div></div>
+        <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.85em">
+          <div><span style="color:var(--text3)">Halving Interval</span><br><strong>${m ? fmt(m.halving_interval) : '—'}</strong> blocks</div>
+          <div><span style="color:var(--text3)">Next Halving</span><br>Block <strong>#${m ? fmt(m.next_halving_block) : '—'}</strong></div>
+          <div><span style="color:var(--text3)">Total Supply</span><br><strong>${m ? fmt(m.total_supply_baud) : '—'}</strong> BAUD</div>
+          <div><span style="color:var(--text3)">Mined So Far</span><br><strong>${m ? fmt(m.total_mined_baud) : '—'}</strong> BAUD</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">Mempool</div>
+        <div style="font-size:.9em;margin-bottom:12px;color:var(--text2)">${S.mempool ? S.mempool.pending_count : 0} pending transactions</div>
+        ${S.mempool && S.mempool.transactions.length > 0 ? `
+          <div class="table-wrap" style="margin-bottom:0"><table>
+            <tr><th>Hash</th><th>Sender</th></tr>
+            ${S.mempool.transactions.slice(0,5).map(tx => `
+              <tr><td class="mono">${shortAddr(tx.hash)}</td><td class="mono">${shortAddr(tx.sender)}</td></tr>
+            `).join('')}
+          </table></div>
+        ` : `<div style="text-align:center;color:var(--text3);padding:20px">No pending transactions</div>`}
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px">
+      <div class="section-title">Node Info</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;font-size:.85em">
+        <div><span style="color:var(--text3)">Chain ID</span><br><strong>${escapeHtml(s.chain_id)}</strong></div>
+        <div><span style="color:var(--text3)">Node Address</span><br><strong class="mono copyable" onclick="copyText('${s.node_address}')">${shortAddr(s.node_address)}</strong></div>
+        <div><span style="color:var(--text3)">State Root</span><br><strong class="mono">${shortAddr(s.state_root)}</strong></div>
+        <div><span style="color:var(--text3)">Last Block Hash</span><br><strong class="mono">${shortAddr(s.last_block_hash)}</strong></div>
+        <div><span style="color:var(--text3)">Mempool Size</span><br><strong>${fmt(s.mempool_size)}</strong></div>
+        <div><span style="color:var(--text3)">Uptime</span><br><strong>${fmtUptime(s.uptime_ms)}</strong></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Mining ──
+function renderMining() {
+  const m = S.mining;
+  const s = S.status;
+  if (!m) return `<div class="page"><div class="page-header"><h1>Mining</h1><p>Waiting for data…</p></div></div>`;
+
+  const pct = parseFloat(m.percent_mined);
+  const eraProgress = ((1 - m.blocks_until_halving/m.halving_interval)*100).toFixed(2);
+
+  return `<div class="page">
+    <div class="page-header"><h1>Mining</h1><p>Block reward schedule and mining statistics</p></div>
+    <div class="cards-grid">
+      <div class="card stat-card">
+        <div class="stat-label">Current Era</div>
+        <div class="stat-value" style="color:var(--primary)">${m.current_era}</div>
+        <div class="stat-sub">of 21 total eras</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Block Reward</div>
+        <div class="stat-value" style="color:var(--gold)">${fmt(m.current_block_reward_baud)}</div>
+        <div class="stat-sub">BAUD per block</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Blocks Until Halving</div>
+        <div class="stat-value" style="color:var(--cyan)">${fmt(m.blocks_until_halving)}</div>
+        <div class="stat-sub">Next: Block #${fmt(m.next_halving_block)}</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Supply Mined</div>
+        <div class="stat-value" style="color:var(--green)">${pct.toFixed(4)}%</div>
+        <div class="stat-sub">${fmt(m.total_mined_baud)} / ${fmt(m.total_supply_baud)} BAUD</div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title"><span class="status-dot green mining-active"></span> Era Progress</div>
+      <div style="display:flex;justify-content:space-between;font-size:.9em;margin-bottom:4px">
+        <span>Era ${m.current_era}</span><span>${eraProgress}%</span>
+      </div>
+      <div class="progress-bar"><div class="fill" style="width:${eraProgress}%"></div></div>
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">Total Supply Progress</div>
+      <div style="display:flex;justify-content:space-between;font-size:.9em;margin-bottom:4px">
+        <span>${fmt(m.total_mined_baud)} BAUD mined</span><span>${pct.toFixed(4)}%</span>
+      </div>
+      <div class="progress-bar"><div class="fill" style="width:${Math.min(pct,100)}%"></div></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Halving Schedule</div>
+      <div class="table-wrap" style="margin-bottom:0"><table>
+        <tr><th>Era</th><th>Block Range</th><th>Block Reward</th><th>Era Supply</th><th>Status</th></tr>
+        ${Array.from({length:8}, (_,i) => {
+          const reward = m.initial_block_reward_baud / Math.pow(2,i);
+          const start = i * m.halving_interval;
+          const end = (i+1) * m.halving_interval - 1;
+          const eraSupply = reward * m.halving_interval;
+          const status = i < m.current_era ? 'Complete' : i === m.current_era ? 'Active' : 'Future';
+          const badge = status === 'Active' ? 'badge-green' : status === 'Complete' ? 'badge-cyan' : 'badge-gold';
+          return `<tr>
+            <td><strong>${i}</strong></td>
+            <td class="mono">${fmt(start)} → ${fmt(end)}</td>
+            <td><strong>${fmt(reward)}</strong> BAUD</td>
+            <td>${fmt(eraSupply)} BAUD</td>
+            <td><span class="badge ${badge}">${status}</span></td>
+          </tr>`;
+        }).join('')}
+      </table></div>
+    </div>
+  </div>`;
+}
+
+// ── Wallet ──
+function renderWallet() {
+  return `<div class="page">
+    <div class="page-header"><h1>Wallet</h1><p>Generate and manage keypairs</p></div>
+    <div class="two-col">
+      <div class="card">
+        <div class="section-title">Generate New Keypair</div>
+        <p style="color:var(--text2);font-size:.9em;margin-bottom:16px">Generate a fresh keypair for sending and receiving BAUD. Your secret key is generated server-side — keep it safe!</p>
+        <button class="btn btn-primary" onclick="generateKeypair()">Generate Keypair</button>
+        <div id="keygen-result" style="margin-top:16px"></div>
+      </div>
+      <div class="card">
+        <div class="section-title">Derive Address</div>
+        <p style="color:var(--text2);font-size:.9em;margin-bottom:16px">Enter a secret key to derive its corresponding address.</p>
+        <div class="form-group">
+          <label>Secret Key</label>
+          <input type="password" id="derive-secret" placeholder="Enter hex-encoded secret key">
+        </div>
+        <button class="btn btn-secondary" onclick="deriveAddress()">Derive Address</button>
+        <div id="derive-result" style="margin-top:16px"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px">
+      <div class="section-title">About Keypairs</div>
+      <div style="font-size:.9em;color:var(--text2);line-height:1.7">
+        <p><strong>Secret Key</strong> — Your private key that signs transactions. Never share it. Back it up securely.</p>
+        <p style="margin-top:8px"><strong>Address</strong> — Your public identity on the Baud network, derived from your secret key. Share your address to receive BAUD.</p>
+        <p style="margin-top:8px"><strong>Why keypairs?</strong> — Every transaction on Baud must be signed by the sender's secret key. This proves ownership and prevents unauthorized spending. Your keypair is your identity on the network.</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Send ──
+function renderSend() {
+  return `<div class="page">
+    <div class="page-header"><h1>Send</h1><p>Create and submit transactions</p></div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchSendTab(this,'transfer')">Transfer</div>
+      <div class="tab" onclick="switchSendTab(this,'escrow')">Escrow</div>
+    </div>
+    <div id="send-transfer">
+      <div class="card">
+        <div class="section-title">Transfer BAUD</div>
+        <div class="form-group">
+          <label>Your Secret Key</label>
+          <input type="password" id="tx-secret" placeholder="Hex-encoded secret key">
+          <div class="hint">Used to sign the transaction. Never sent to anyone.</div>
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Recipient Address</label>
+            <input type="text" id="tx-to" placeholder="Hex-encoded address" class="mono">
+          </div>
+          <div class="form-group">
+            <label>Amount (quanta)</label>
+            <input type="number" id="tx-amount" placeholder="1000000 = 1 BAUD" min="1">
+            <div class="hint">1 BAUD = 1,000,000 quanta</div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Nonce</label>
+            <input type="number" id="tx-nonce" placeholder="Account nonce" min="0">
+            <div class="hint">Must match your current account nonce</div>
+          </div>
+          <div class="form-group">
+            <label>Memo (optional)</label>
+            <input type="text" id="tx-memo" placeholder="Optional message">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="submitTransfer()" style="margin-top:8px">Sign &amp; Submit</button>
+        <div id="tx-result" style="margin-top:16px"></div>
+      </div>
+    </div>
+    <div id="send-escrow" style="display:none">
+      <div class="card">
+        <div class="section-title">Create Escrow</div>
+        <div class="form-group">
+          <label>Your Secret Key</label>
+          <input type="password" id="esc-secret" placeholder="Hex-encoded secret key">
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Recipient Address</label>
+            <input type="text" id="esc-recipient" placeholder="Hex-encoded address" class="mono">
+          </div>
+          <div class="form-group">
+            <label>Amount (quanta)</label>
+            <input type="number" id="esc-amount" placeholder="Amount in quanta" min="1">
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Preimage (hash lock secret)</label>
+            <input type="text" id="esc-preimage" placeholder="Secret string for the hash lock">
+          </div>
+          <div class="form-group">
+            <label>Deadline (block height)</label>
+            <input type="number" id="esc-deadline" placeholder="Block height deadline" min="1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Nonce</label>
+          <input type="number" id="esc-nonce" placeholder="Account nonce" min="0">
+        </div>
+        <button class="btn btn-primary" onclick="submitEscrow()">Sign &amp; Submit Escrow</button>
+        <div id="esc-result" style="margin-top:16px"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Accounts ──
+function renderAccounts() {
+  return `<div class="page">
+    <div class="page-header"><h1>Account Lookup</h1><p>Check any account's balance and details</p></div>
+    <div class="card" style="margin-bottom:20px">
+      <div style="display:flex;gap:12px;align-items:end">
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <label>Address</label>
+          <input type="text" id="lookup-address" placeholder="Enter hex-encoded address" class="mono"
+                 onkeydown="if(event.key==='Enter')lookupAccount()">
+        </div>
+        <button class="btn btn-primary" onclick="lookupAccount()" style="margin-bottom:0;height:42px">Look Up</button>
+      </div>
+    </div>
+    <div id="account-result"></div>
+    ${S.status ? `
+      <div class="card" style="margin-top:20px">
+        <div class="section-title">Quick — Validator Account</div>
+        <p style="color:var(--text2);font-size:.9em;margin-bottom:12px">Look up the current node's validator balance:</p>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('lookup-address').value='${S.status.node_address}';lookupAccount()">
+          ${shortAddr(S.status.node_address)}
+        </button>
+      </div>
+    ` : ''}
+  </div>`;
+}
+
+// ── Mempool ──
+function renderMempool() {
+  const mp = S.mempool;
+  return `<div class="page">
+    <div class="page-header"><h1>Mempool</h1><p>Pending transactions waiting for inclusion in a block</p></div>
+    <div class="cards-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+      <div class="card stat-card">
+        <div class="stat-label">Pending</div>
+        <div class="stat-value" style="color:var(--primary)">${mp ? fmt(mp.pending_count) : '—'}</div>
+      </div>
+    </div>
+    ${mp && mp.transactions.length > 0 ? `
+      <div class="table-wrap"><table>
+        <tr><th>Hash</th><th>Sender</th><th>Nonce</th><th>Timestamp</th></tr>
+        ${mp.transactions.map(tx => `
+          <tr>
+            <td class="mono copyable" onclick="copyText('${tx.hash}')">${shortAddr(tx.hash)}</td>
+            <td class="mono copyable" onclick="copyText('${tx.sender}')">${shortAddr(tx.sender)}</td>
+            <td>${tx.nonce}</td>
+            <td>${new Date(tx.timestamp).toLocaleTimeString()}</td>
+          </tr>
+        `).join('')}
+      </table></div>
+    ` : `
+      <div class="card" style="text-align:center;padding:48px;color:var(--text3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin:0 auto 12px;opacity:.4"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
+        <p>Mempool is empty — all transactions have been included in blocks</p>
+      </div>
+    `}
+  </div>`;
+}
+
+// ── Node Info ──
+function renderNode() {
+  const s = S.status;
+  const h = S.health;
+  if (!s) return `<div class="page"><div class="page-header"><h1>Node Info</h1><p>Waiting for data…</p></div></div>`;
+
+  return `<div class="page">
+    <div class="page-header"><h1>Node Info</h1><p>Configuration and diagnostics</p></div>
+    <div class="cards-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+      <div class="card stat-card">
+        <div class="stat-label">Status</div>
+        <div class="stat-value"><span class="badge badge-green">${h ? h.status : 'unknown'}</span></div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Height</div>
+        <div class="stat-value" style="color:var(--primary)">${fmt(s.height)}</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value" style="color:var(--cyan)">${fmtUptime(s.uptime_ms)}</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Accounts</div>
+        <div class="stat-value">${fmt(s.accounts)}</div>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="section-title">Chain Details</div>
+        <table><tbody>
+          <tr><td style="color:var(--text3);width:140px">Chain ID</td><td><strong>${escapeHtml(s.chain_id)}</strong></td></tr>
+          <tr><td style="color:var(--text3)">Node Address</td><td class="mono copyable" onclick="copyText('${s.node_address}')">${s.node_address}</td></tr>
+          <tr><td style="color:var(--text3)">State Root</td><td class="mono copyable" onclick="copyText('${s.state_root}')">${shortAddr(s.state_root)}</td></tr>
+          <tr><td style="color:var(--text3)">Last Block Hash</td><td class="mono copyable" onclick="copyText('${s.last_block_hash}')">${shortAddr(s.last_block_hash)}</td></tr>
+          <tr><td style="color:var(--text3)">Escrows</td><td>${fmt(s.escrows)}</td></tr>
+          <tr><td style="color:var(--text3)">Mempool Size</td><td>${fmt(s.mempool_size)}</td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="section-title">API Endpoints</div>
+        <div style="font-size:.85em;line-height:2">
+          <div><span class="badge badge-green">GET</span> <code>/v1/status</code></div>
+          <div><span class="badge badge-green">GET</span> <code>/v1/account/:address</code></div>
+          <div><span class="badge badge-cyan">POST</span> <code>/v1/tx</code></div>
+          <div><span class="badge badge-green">GET</span> <code>/v1/tx/:hash</code></div>
+          <div><span class="badge badge-green">GET</span> <code>/v1/escrow/:id</code></div>
+          <div><span class="badge badge-green">GET</span> <code>/v1/mempool</code></div>
+          <div><span class="badge badge-green">GET</span> <code>/v1/health</code></div>
+          <div><span class="badge badge-green">GET</span> <code>/v1/metrics</code></div>
+          <div><span class="badge badge-green">GET</span> <code>/v1/mining</code></div>
+          <div><span class="badge badge-gold">GET</span> <code>/v1/keygen</code></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── Actions ────────────────────────────────────────────────────────────────
+
+async function generateKeypair() {
+  const el = $('#keygen-result');
+  el.innerHTML = '<div class="alert alert-info">Generating…</div>';
+  const data = await fetchJSON('/v1/keygen');
+  if (!data) { el.innerHTML = '<div class="alert alert-error">Failed to generate keypair</div>'; return; }
+  el.innerHTML = `
+    <div class="alert alert-success" style="margin-bottom:12px">Keypair generated!</div>
+    <div style="font-size:.85em;margin-bottom:8px"><strong>Address</strong> (public — safe to share)</div>
+    <div class="json-view copyable" onclick="copyText('${data.address}')" style="margin-bottom:12px;word-break:break-all">${data.address}</div>
+    <div style="font-size:.85em;margin-bottom:8px"><strong>Secret Key</strong> (private — NEVER share!)</div>
+    <div class="json-view copyable" onclick="copyText('${data.secret_key}')" style="word-break:break-all;color:var(--red)">${data.secret_key}</div>
+    <div class="hint" style="margin-top:8px;color:var(--gold)">⚠ Save your secret key now! It won't be shown again.</div>
+  `;
+}
+
+async function deriveAddress() {
+  const secret = $('#derive-secret').value.trim();
+  if (!secret) return;
+  const el = $('#derive-result');
+  el.innerHTML = '<div class="alert alert-info">Deriving…</div>';
+  const resp = await fetch(API + '/v1/keygen?derive=' + encodeURIComponent(secret));
+  if (!resp.ok) { el.innerHTML = '<div class="alert alert-error">Invalid secret key</div>'; return; }
+  const data = await resp.json();
+  el.innerHTML = `
+    <div style="font-size:.85em;margin-bottom:8px"><strong>Address</strong></div>
+    <div class="json-view copyable" onclick="copyText('${data.address}')" style="word-break:break-all">${data.address}</div>
+  `;
+}
+
+async function lookupAccount() {
+  const addr = $('#lookup-address').value.trim();
+  if (!addr) return;
+  const el = $('#account-result');
+  el.innerHTML = '<div class="alert alert-info">Looking up…</div>';
+  const data = await fetchJSON('/v1/account/' + encodeURIComponent(addr));
+  if (!data) { el.innerHTML = '<div class="alert alert-error">Account not found or invalid address</div>'; return; }
+  el.innerHTML = `
+    <div class="card">
+      <div class="section-title">Account Details</div>
+      <table><tbody>
+        <tr><td style="color:var(--text3);width:120px">Address</td><td class="mono copyable" onclick="copyText('${data.address}')" style="word-break:break-all">${data.address}</td></tr>
+        <tr><td style="color:var(--text3)">Balance</td><td><strong style="color:var(--green);font-size:1.2em">${fmtBaud(data.balance)} BAUD</strong><br><span style="font-size:.8em;color:var(--text3)">${fmt(data.balance)} quanta</span></td></tr>
+        <tr><td style="color:var(--text3)">Nonce</td><td>${data.nonce}</td></tr>
+        ${data.agent_meta ? `
+          <tr><td style="color:var(--text3)">Agent Name</td><td>${escapeHtml(data.agent_meta.name)}</td></tr>
+          <tr><td style="color:var(--text3)">Endpoint</td><td>${escapeHtml(data.agent_meta.endpoint)}</td></tr>
+          <tr><td style="color:var(--text3)">Capabilities</td><td>${data.agent_meta.capabilities.map(c => `<span class="badge badge-cyan">${escapeHtml(c)}</span> `).join('')}</td></tr>
+        ` : ''}
+      </tbody></table>
+    </div>
+  `;
+}
+
+function switchSendTab(el, tab) {
+  $$('.tabs .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  $('#send-transfer').style.display = tab === 'transfer' ? '' : 'none';
+  $('#send-escrow').style.display = tab === 'escrow' ? '' : 'none';
+}
+
+async function submitTransfer() {
+  const secret = $('#tx-secret').value.trim();
+  const to = $('#tx-to').value.trim();
+  const amount = $('#tx-amount').value.trim();
+  const nonce = $('#tx-nonce').value.trim();
+  const memo = $('#tx-memo').value.trim();
+  const el = $('#tx-result');
+
+  if (!secret || !to || !amount || nonce === '') {
+    el.innerHTML = '<div class="alert alert-error">Please fill in all required fields</div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="alert alert-info">Signing and submitting…</div>';
+
+  try {
+    const resp = await fetch(API + '/v1/sign-and-submit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        type: 'Transfer',
+        secret, to,
+        amount: parseInt(amount),
+        nonce: parseInt(nonce),
+        memo: memo || null,
+        chain_id: S.status ? S.status.chain_id : 'baud-mainnet',
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      el.innerHTML = `<div class="alert alert-success">Transaction submitted!<br><span class="mono">${data.tx_hash}</span></div>`;
+    } else {
+      el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error || 'Submission failed')}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function submitEscrow() {
+  const secret = $('#esc-secret').value.trim();
+  const recipient = $('#esc-recipient').value.trim();
+  const amount = $('#esc-amount').value.trim();
+  const preimage = $('#esc-preimage').value.trim();
+  const deadline = $('#esc-deadline').value.trim();
+  const nonce = $('#esc-nonce').value.trim();
+  const el = $('#esc-result');
+
+  if (!secret || !recipient || !amount || !preimage || !deadline || nonce === '') {
+    el.innerHTML = '<div class="alert alert-error">Please fill in all required fields</div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="alert alert-info">Signing and submitting…</div>';
+
+  try {
+    const resp = await fetch(API + '/v1/sign-and-submit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        type: 'EscrowCreate',
+        secret, recipient,
+        amount: parseInt(amount),
+        preimage, deadline: parseInt(deadline),
+        nonce: parseInt(nonce),
+        chain_id: S.status ? S.status.chain_id : 'baud-mainnet',
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      el.innerHTML = `<div class="alert alert-success">Escrow created!<br><span class="mono">${data.tx_hash}</span></div>`;
+    } else {
+      el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error || 'Submission failed')}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// ─── Init ───────────────────────────────────────────────────────────────────
+(function init() {
+  const saved = localStorage.getItem('baud-theme');
+  if (saved) document.documentElement.dataset.theme = saved;
+  updateThemeUI();
+
+  const page = location.hash.slice(1) || 'dashboard';
+  navigate(page);
+  refreshData();
+  setInterval(refreshData, 2000);
+})();
+</script>
+</body>
+</html>

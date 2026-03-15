@@ -19,10 +19,15 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 
-use baud_core::crypto::{Address, Hash, Signature};
+use axum::extract::Query;
+use axum::response::Html;
+
+use baud_core::crypto::{Address, Hash, KeyPair, Signature};
 use baud_core::mempool::Mempool;
 use baud_core::state::WorldState;
 use baud_core::types::{EscrowStatus, Transaction, TxPayload};
+
+static DASHBOARD_HTML: &str = include_str!("../dashboard.html");
 
 // ─── Shared App State ───────────────────────────────────────────────────────
 
@@ -243,6 +248,7 @@ pub fn build_router(state: AppState) -> Router {
 /// Build the router with a custom rate limiter (useful for tests).
 pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Router {
     Router::new()
+        .route("/", get(serve_dashboard))
         .route("/v1/status", get(get_status))
         .route("/v1/account/:address", get(get_account))
         .route("/v1/tx", post(submit_tx))
@@ -252,6 +258,8 @@ pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Ro
         .route("/v1/health", get(get_health))
         .route("/v1/metrics", get(get_metrics))
         .route("/v1/mining", get(get_mining_info))
+        .route("/v1/keygen", get(keygen))
+        .route("/v1/sign-and-submit", post(sign_and_submit))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
         .layer(middleware::from_fn_with_state(
             limiter,
@@ -565,6 +573,120 @@ async fn get_mining_info(State(state): State<AppState>) -> impl IntoResponse {
         "total_supply_baud": TOTAL_SUPPLY_QUANTA / QUANTA_PER_BAUD,
         "percent_mined": format!("{:.4}", percent_mined),
     }))
+}
+
+// ─── Dashboard ──────────────────────────────────────────────────────────────
+
+async fn serve_dashboard() -> Html<&'static str> {
+    Html(DASHBOARD_HTML)
+}
+
+// ─── Keygen ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+struct KeygenQuery {
+    derive: Option<String>,
+}
+
+async fn keygen(Query(q): Query<KeygenQuery>) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    match q.derive {
+        Some(secret) => {
+            let kp = KeyPair::from_secret_hex(&secret).map_err(|e| {
+                (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("invalid secret key: {e}") }))
+            })?;
+            Ok(Json(serde_json::json!({ "address": kp.address().to_hex() })))
+        }
+        None => {
+            let kp = KeyPair::generate();
+            Ok(Json(serde_json::json!({
+                "address": kp.address().to_hex(),
+                "secret_key": kp.secret_hex(),
+            })))
+        }
+    }
+}
+
+// ─── Sign & Submit (dashboard convenience) ──────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+struct SignAndSubmitRequest {
+    #[serde(rename = "type")]
+    tx_type: String,
+    secret: String,
+    #[serde(default)]
+    to: Option<String>,
+    #[serde(default)]
+    recipient: Option<String>,
+    #[serde(default)]
+    amount: Option<u128>,
+    nonce: u64,
+    #[serde(default)]
+    memo: Option<String>,
+    #[serde(default)]
+    preimage: Option<String>,
+    #[serde(default)]
+    deadline: Option<u64>,
+    #[serde(default)]
+    chain_id: Option<String>,
+}
+
+async fn sign_and_submit(
+    State(state): State<AppState>,
+    Json(req): Json<SignAndSubmitRequest>,
+) -> Result<(StatusCode, Json<SubmitTxResponse>), (StatusCode, Json<ErrorResponse>)> {
+    let kp = KeyPair::from_secret_hex(&req.secret).map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("invalid secret key: {e}") }))
+    })?;
+
+    let chain_id = req.chain_id.unwrap_or_else(|| state.chain_id.clone());
+
+    let payload = match req.tx_type.as_str() {
+        "Transfer" => {
+            let to_str = req.to.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'to' field".into() })))?;
+            let to_addr = Address::from_hex(&to_str).map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("invalid address: {e}") })))?;
+            let amount = req.amount.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'amount' field".into() })))?;
+            TxPayload::Transfer { to: to_addr, amount, memo: req.memo.map(|m| m.into_bytes()) }
+        }
+        "EscrowCreate" => {
+            let recip_str = req.recipient.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'recipient' field".into() })))?;
+            let recip_addr = Address::from_hex(&recip_str).map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("invalid address: {e}") })))?;
+            let amount = req.amount.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'amount' field".into() })))?;
+            let preimage_str = req.preimage.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'preimage' field".into() })))?;
+            let deadline = req.deadline.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'deadline' field".into() })))?;
+            let hash_lock = Hash::digest(preimage_str.as_bytes());
+            TxPayload::EscrowCreate { recipient: recip_addr, amount, hash_lock, deadline }
+        }
+        _ => return Err((StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("unsupported tx type: {}", req.tx_type) }))),
+    };
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    let mut tx = Transaction {
+        sender: kp.address(),
+        nonce: req.nonce,
+        payload,
+        timestamp: now,
+        chain_id,
+        signature: Signature::zero(),
+    };
+
+    let hash = tx.signable_hash();
+    tx.signature = kp.sign(hash.as_bytes());
+
+    // Validate
+    tx.validate_structure().map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("{e}") })))?;
+    {
+        let ws = state.world_state.read();
+        ws.validate_transaction(&tx, now).map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("{e}") })))?;
+    }
+
+    let tx_hash = state.mempool.add(tx).map_err(|e| (StatusCode::CONFLICT, Json(ErrorResponse { error: format!("{e}") })))?;
+    state.tx_processed.fetch_add(1, Ordering::Relaxed);
+
+    Ok((StatusCode::ACCEPTED, Json(SubmitTxResponse { tx_hash: tx_hash.to_hex(), status: "pending".into() })))
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

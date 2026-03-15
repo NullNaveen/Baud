@@ -240,6 +240,13 @@ enum Commands {
         #[arg(long)]
         label: String,
     },
+
+    /// Open the web dashboard in your browser.
+    Dashboard {
+        /// Node API URL.
+        #[arg(long, default_value = "http://localhost:8080")]
+        node: String,
+    },
 }
 
 fn now_ms() -> u64 {
@@ -538,7 +545,7 @@ fn main() -> Result<()> {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(async {
                 let client = reqwest::Client::new();
-                let url = format!("{node}/tx");
+                let url = format!("{node}/v1/tx");
                 let resp = client
                     .post(&url)
                     .header("Content-Type", "application/json")
@@ -558,7 +565,7 @@ fn main() -> Result<()> {
         Commands::Balance { node, address } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(async {
-                let url = format!("{node}/account/{address}");
+                let url = format!("{node}/v1/account/{address}");
                 let resp = reqwest::get(&url).await.context("request failed")?;
                 let body = resp.text().await?;
                 println!("{body}");
@@ -569,7 +576,7 @@ fn main() -> Result<()> {
         Commands::Status { node } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(async {
-                let url = format!("{node}/status");
+                let url = format!("{node}/v1/status");
                 let resp = reqwest::get(&url).await.context("request failed")?;
                 let body = resp.text().await?;
                 println!("{body}");
@@ -635,6 +642,16 @@ fn main() -> Result<()> {
                 "secret_key": entry.secret_key,
             });
             println!("{}", serde_json::to_string_pretty(&output)?);
+        }
+
+        Commands::Dashboard { node } => {
+            println!("Opening Baud dashboard at {node}");
+            #[cfg(target_os = "windows")]
+            { let _ = std::process::Command::new("cmd").args(["/C", "start", &node]).spawn(); }
+            #[cfg(target_os = "macos")]
+            { let _ = std::process::Command::new("open").arg(&node).spawn(); }
+            #[cfg(target_os = "linux")]
+            { let _ = std::process::Command::new("xdg-open").arg(&node).spawn(); }
         }
     }
 
