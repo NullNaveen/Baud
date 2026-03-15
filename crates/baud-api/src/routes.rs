@@ -244,10 +244,10 @@ pub fn build_router(state: AppState) -> Router {
 pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Router {
     Router::new()
         .route("/v1/status", get(get_status))
-        .route("/v1/account/{address}", get(get_account))
+        .route("/v1/account/:address", get(get_account))
         .route("/v1/tx", post(submit_tx))
-        .route("/v1/tx/{hash}", get(get_tx))
-        .route("/v1/escrow/{id}", get(get_escrow))
+        .route("/v1/tx/:hash", get(get_tx))
+        .route("/v1/escrow/:id", get(get_escrow))
         .route("/v1/mempool", get(get_mempool))
         .route("/v1/health", get(get_health))
         .route("/v1/metrics", get(get_metrics))
