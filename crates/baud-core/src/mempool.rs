@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use parking_lot::RwLock;
 use tracing::debug;
 
-use crate::crypto::{Address, Hash};
+use crate::crypto::{verify_signature, Address, Hash};
 use crate::error::{BaudError, BaudResult};
 use crate::types::Transaction;
 
@@ -41,8 +41,16 @@ impl Mempool {
         }
     }
 
-    /// Add a transaction to the mempool. Rejects duplicates and capacity overflow.
+    /// Add a transaction to the mempool. Rejects duplicates, capacity overflow,
+    /// and structurally invalid or unsigned transactions.
     pub fn add(&self, tx: Transaction) -> BaudResult<Hash> {
+        // Structural validation (prevents malformed txs from consuming pool space).
+        tx.validate_structure()?;
+
+        // Signature verification (prevents unsigned/forged txs from entering pool).
+        let signable = tx.signable_hash();
+        verify_signature(&tx.sender, signable.as_bytes(), &tx.signature)?;
+
         let tx_hash = tx.hash();
 
         let mut by_hash = self.by_hash.write();

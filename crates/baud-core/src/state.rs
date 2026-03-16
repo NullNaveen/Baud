@@ -87,12 +87,19 @@ impl WorldState {
     }
 
     /// Compute the state root: BLAKE3 hash of the deterministic serialization
-    /// of all accounts sorted by address.
+    /// of all accounts, escrows, and milestone escrows.
     pub fn state_root(&self) -> Hash {
-        let mut sorted: Vec<_> = self.accounts.iter().collect();
-        sorted.sort_by_key(|(addr, _)| addr.0);
+        let mut sorted_accounts: Vec<_> = self.accounts.iter().collect();
+        sorted_accounts.sort_by_key(|(addr, _)| addr.0);
 
-        let bytes = bincode::serialize(&sorted).expect("state serialization should never fail");
+        let mut sorted_escrows: Vec<_> = self.escrows.iter().collect();
+        sorted_escrows.sort_by_key(|(id, _)| id.0);
+
+        let mut sorted_milestone_escrows: Vec<_> = self.milestone_escrows.iter().collect();
+        sorted_milestone_escrows.sort_by_key(|(id, _)| id.0);
+
+        let data = (&sorted_accounts, &sorted_escrows, &sorted_milestone_escrows);
+        let bytes = bincode::serialize(&data).expect("state serialization should never fail");
         Hash::digest(&bytes)
     }
 
@@ -290,23 +297,18 @@ impl WorldState {
     /// Caller MUST have called `validate_transaction` first.
     ///
     /// All balance mutations use checked arithmetic to prevent overflow/underflow.
+    /// Nonce is incremented last so a payload failure does not consume a nonce.
     pub fn apply_transaction(&mut self, tx: &Transaction) -> BaudResult<()> {
         let sender_addr = tx.sender;
-
-        // Increment sender nonce first (prevents reentrancy-like issues).
-        {
-            let sender = self
-                .accounts
-                .entry(sender_addr)
-                .or_insert_with(|| Account::new(sender_addr));
-            sender.nonce = sender.nonce.checked_add(1).ok_or(BaudError::Overflow)?;
-        }
 
         match &tx.payload {
             TxPayload::Transfer { to, amount, .. } => {
                 // Debit sender (checked).
                 {
-                    let sender = self.accounts.get_mut(&sender_addr).unwrap();
+                    let sender = self
+                        .accounts
+                        .get_mut(&sender_addr)
+                        .ok_or_else(|| BaudError::AccountNotFound(sender_addr.to_hex()))?;
                     sender.balance = sender.balance.checked_sub(*amount).ok_or(
                         BaudError::InsufficientBalance {
                             have: sender.balance,
@@ -357,7 +359,10 @@ impl WorldState {
                 }
                 // Debit sender.
                 {
-                    let sender = self.accounts.get_mut(&sender_addr).unwrap();
+                    let sender = self
+                        .accounts
+                        .get_mut(&sender_addr)
+                        .ok_or_else(|| BaudError::AccountNotFound(sender_addr.to_hex()))?;
                     sender.balance = sender.balance.checked_sub(*amount).ok_or(
                         BaudError::InsufficientBalance {
                             have: sender.balance,
@@ -385,8 +390,10 @@ impl WorldState {
                 escrow_id,
                 preimage: _,
             } => {
-                // State change first (prevents logical reentrancy).
-                let escrow = self.escrows.get_mut(escrow_id).unwrap();
+                let escrow = self
+                    .escrows
+                    .get_mut(escrow_id)
+                    .ok_or_else(|| BaudError::EscrowNotFound(escrow_id.to_hex()))?;
                 escrow.status = EscrowStatus::Released;
                 let recipient = escrow.recipient;
                 let amount = escrow.amount;
@@ -401,7 +408,10 @@ impl WorldState {
             }
 
             TxPayload::EscrowRefund { escrow_id } => {
-                let escrow = self.escrows.get_mut(escrow_id).unwrap();
+                let escrow = self
+                    .escrows
+                    .get_mut(escrow_id)
+                    .ok_or_else(|| BaudError::EscrowNotFound(escrow_id.to_hex()))?;
                 escrow.status = EscrowStatus::Refunded;
                 let sender = escrow.sender;
                 let amount = escrow.amount;
@@ -420,7 +430,10 @@ impl WorldState {
                 endpoint,
                 capabilities,
             } => {
-                let acc = self.accounts.get_mut(&sender_addr).unwrap();
+                let acc = self
+                    .accounts
+                    .get_mut(&sender_addr)
+                    .ok_or_else(|| BaudError::AccountNotFound(sender_addr.to_hex()))?;
                 acc.agent_meta = Some(AgentMeta {
                     name: name.clone(),
                     endpoint: endpoint.clone(),
@@ -456,7 +469,10 @@ impl WorldState {
                     .try_fold(0u128, |acc, m| acc.checked_add(m.amount))
                     .ok_or(BaudError::Overflow)?;
                 {
-                    let sender = self.accounts.get_mut(&sender_addr).unwrap();
+                    let sender = self
+                        .accounts
+                        .get_mut(&sender_addr)
+                        .ok_or_else(|| BaudError::AccountNotFound(sender_addr.to_hex()))?;
                     sender.balance = sender.balance.checked_sub(total).ok_or(
                         BaudError::InsufficientBalance {
                             have: sender.balance,
@@ -493,7 +509,10 @@ impl WorldState {
                 milestone_index,
                 preimage: _,
             } => {
-                let escrow = self.milestone_escrows.get_mut(escrow_id).unwrap();
+                let escrow = self
+                    .milestone_escrows
+                    .get_mut(escrow_id)
+                    .ok_or_else(|| BaudError::EscrowNotFound(escrow_id.to_hex()))?;
                 let idx = *milestone_index as usize;
                 let amount = escrow.milestones[idx].amount;
                 escrow.milestones[idx].completed = true;
@@ -522,7 +541,10 @@ impl WorldState {
                 co_signers,
                 required_co_signers,
             } => {
-                let acc = self.accounts.get_mut(&sender_addr).unwrap();
+                let acc = self
+                    .accounts
+                    .get_mut(&sender_addr)
+                    .ok_or_else(|| BaudError::AccountNotFound(sender_addr.to_hex()))?;
                 acc.spending_policy = Some(SpendingPolicy {
                     auto_approve_limit: *auto_approve_limit,
                     co_signers: co_signers.clone(),
@@ -532,10 +554,21 @@ impl WorldState {
             }
         }
 
+        // Increment sender nonce last — only after successful payload application.
+        {
+            let sender = self
+                .accounts
+                .entry(sender_addr)
+                .or_insert_with(|| Account::new(sender_addr));
+            sender.nonce = sender.nonce.checked_add(1).ok_or(BaudError::Overflow)?;
+        }
+
         Ok(())
     }
 
     /// Apply a full block of transactions. Returns error on the first invalid tx.
+    /// Application is atomic: if any transaction fails or the state root
+    /// doesn't match, the original state is left unchanged.
     pub fn apply_block(&mut self, block: &crate::types::Block) -> BaudResult<()> {
         let expected_height = self.height.checked_add(1).ok_or(BaudError::Overflow)?;
         if block.header.height != expected_height {
@@ -554,9 +587,12 @@ impl WorldState {
             return Err(BaudError::InvalidPrevHash);
         }
 
+        // Clone state for atomic application — mutations go to `new` first.
+        let mut new = self.clone();
+
         // Apply all transactions.
         for tx in &block.transactions {
-            self.apply_transaction(tx)?;
+            new.apply_transaction(tx)?;
         }
 
         // ── Mining reward ───────────────────────────────────────────────
@@ -564,7 +600,7 @@ impl WorldState {
         let reward = crate::types::block_reward_at(block.header.height);
         if reward > 0 {
             let proposer = block.header.proposer;
-            let account = self
+            let account = new
                 .accounts
                 .entry(proposer)
                 .or_insert_with(|| Account::new(proposer));
@@ -582,11 +618,11 @@ impl WorldState {
         }
 
         // Update chain tip.
-        self.height = block.header.height;
-        self.last_block_hash = block.header.hash();
+        new.height = block.header.height;
+        new.last_block_hash = block.header.hash();
 
         // Verify state root after application.
-        let computed_root = self.state_root();
+        let computed_root = new.state_root();
         if block.header.state_root != computed_root {
             warn!(
                 expected = %block.header.state_root,
@@ -596,6 +632,8 @@ impl WorldState {
             return Err(BaudError::InvalidStateRoot);
         }
 
+        // All checks passed — commit the new state atomically.
+        *self = new;
         Ok(())
     }
 
