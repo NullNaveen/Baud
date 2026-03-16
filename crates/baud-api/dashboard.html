@@ -258,10 +258,11 @@ tr:hover td{background:var(--card-hover)}
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
 const S = {
-  status: null, mining: null, mempool: null, health: null,
+  status: null, mining: null, mempool: null, health: null, myAccount: null,
   lastUpdate: 0, connected: false, page: 'dashboard',
 };
 const API = location.origin;
+const TOTAL_SUPPLY = 1000000000; // 1 billion BAUD
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const $ = s => document.querySelector(s);
@@ -332,6 +333,11 @@ async function refreshData() {
   S.connected = !!status;
   S.lastUpdate = Date.now();
 
+  // Fetch validator's own account balance
+  if (status && status.node_address) {
+    S.myAccount = await fetchJSON('/v1/account/' + status.node_address);
+  }
+
   const dot = $('#status-dot');
   const txt = $('#node-status-text');
   if (S.connected) {
@@ -392,72 +398,104 @@ function renderPage() {
 function renderDashboard() {
   const s = S.status;
   const m = S.mining;
-  if (!s) return `<div class="page"><div class="page-header"><h1>Dashboard</h1><p>Connecting to node…</p></div></div>`;
+  const acct = S.myAccount;
+  if (!s) return `<div class="page"><div class="page-header"><h1>Dashboard</h1><p>Connecting to your node…</p></div></div>`;
 
   const rewardBaud = m ? fmt(m.current_block_reward_baud) : '—';
   const pctMined = m ? parseFloat(m.percent_mined) : 0;
 
+  // Calculate balance info
+  const myBalanceBaud = acct ? fmtBaud(acct.balance) : '—';
+  const myBalanceNum = acct ? Number(BigInt(acct.balance) / 1000000n) : 0;
+  const myPctOfSupply = myBalanceNum > 0 ? ((myBalanceNum / TOTAL_SUPPLY) * 100) : 0;
+  const myPctStr = myPctOfSupply >= 0.01 ? myPctOfSupply.toFixed(2) : myPctOfSupply.toFixed(4);
+
   return `<div class="page">
-    <div class="page-header"><h1>Dashboard</h1><p>Real-time overview of your Baud node</p></div>
+    <div class="page-header"><h1>Dashboard</h1><p>Welcome to your Baud node — here's what's happening right now</p></div>
+
+    <!-- Your Balance — Hero Card -->
+    <div class="card" style="margin-bottom:24px;background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(6,182,212,.08));border-color:rgba(139,92,246,.3)">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+        <div>
+          <div style="font-size:.8em;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:4px">Your Balance</div>
+          <div style="font-size:2.4em;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${myBalanceBaud} <span style="font-size:.45em;color:var(--text2)">BAUD</span></div>
+          <div style="font-size:.85em;color:var(--text2);margin-top:2px">
+            ${myPctOfSupply > 0 ? `You own <strong style="color:var(--primary-light)">${myPctStr}%</strong> of the total 1 billion BAUD supply` : 'Mining in progress…'}
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.8em;color:var(--text3);margin-bottom:4px">Earning</div>
+          <div style="font-size:1.4em;font-weight:600;color:var(--gold)">${rewardBaud} <span style="font-size:.6em;color:var(--text2)">BAUD/block</span></div>
+          <div style="font-size:.8em;color:var(--text3);margin-top:2px">≈ ${m ? fmt(m.current_block_reward_baud * 60) : '—'} BAUD/minute</div>
+        </div>
+      </div>
+      ${myPctOfSupply > 0 ? `
+      <div class="progress-bar" style="margin-top:16px;height:10px">
+        <div class="fill" style="width:${Math.min(myPctOfSupply, 100)}%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.75em;color:var(--text3);margin-top:4px">
+        <span>0%</span><span>${myPctStr}% of 1,000,000,000 BAUD</span><span>100%</span>
+      </div>` : ''}
+    </div>
+
     <div class="cards-grid">
       <div class="card stat-card">
-        <div class="stat-label">Block Height</div>
+        <div class="stat-label">Blocks Produced</div>
         <div class="stat-value" style="color:var(--primary)">${fmt(s.height)}</div>
         <div class="stat-sub">${fmtUptime(s.uptime_ms)} uptime</div>
       </div>
       <div class="card stat-card">
-        <div class="stat-label">Block Reward</div>
-        <div class="stat-value" style="color:var(--gold)">${rewardBaud}</div>
-        <div class="stat-sub">BAUD per block</div>
-      </div>
-      <div class="card stat-card">
-        <div class="stat-label">Total Mined</div>
+        <div class="stat-label">Network Mined</div>
         <div class="stat-value" style="color:var(--green)">${m ? fmt(m.total_mined_baud) : '—'}</div>
-        <div class="stat-sub">${pctMined.toFixed(4)}% of supply</div>
+        <div class="stat-sub">${pctMined.toFixed(4)}% of total supply</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Accounts</div>
         <div class="stat-value" style="color:var(--cyan)">${fmt(s.accounts)}</div>
-        <div class="stat-sub">${fmt(s.escrows)} escrows</div>
+        <div class="stat-sub">${fmt(s.escrows)} active escrows</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Mempool</div>
+        <div class="stat-value" style="color:var(--orange)">${fmt(s.mempool_size)}</div>
+        <div class="stat-sub">pending transactions</div>
       </div>
     </div>
     <div class="two-col">
       <div class="card">
         <div class="section-title"><span class="status-dot green mining-active"></span> Mining Progress</div>
         <div style="display:flex;justify-content:space-between;font-size:.9em;margin-bottom:4px">
-          <span>Era ${m ? m.current_era : 0}</span>
-          <span>${m ? fmt(m.blocks_until_halving) : '—'} blocks to halving</span>
+          <span>Era ${m ? m.current_era : 0} of 21</span>
+          <span>${m ? fmt(m.blocks_until_halving) : '—'} blocks until reward halves</span>
         </div>
         <div class="progress-bar"><div class="fill" style="width:${m ? ((1 - m.blocks_until_halving/m.halving_interval)*100) : 0}%"></div></div>
         <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.85em">
-          <div><span style="color:var(--text3)">Halving Interval</span><br><strong>${m ? fmt(m.halving_interval) : '—'}</strong> blocks</div>
+          <div><span style="color:var(--text3)">Blocks Per Era</span><br><strong>${m ? fmt(m.halving_interval) : '—'}</strong></div>
           <div><span style="color:var(--text3)">Next Halving</span><br>Block <strong>#${m ? fmt(m.next_halving_block) : '—'}</strong></div>
-          <div><span style="color:var(--text3)">Total Supply</span><br><strong>${m ? fmt(m.total_supply_baud) : '—'}</strong> BAUD</div>
+          <div><span style="color:var(--text3)">Max Supply</span><br><strong>${m ? fmt(m.total_supply_baud) : '—'}</strong> BAUD</div>
           <div><span style="color:var(--text3)">Mined So Far</span><br><strong>${m ? fmt(m.total_mined_baud) : '—'}</strong> BAUD</div>
         </div>
       </div>
       <div class="card">
-        <div class="section-title">Mempool</div>
-        <div style="font-size:.9em;margin-bottom:12px;color:var(--text2)">${S.mempool ? S.mempool.pending_count : 0} pending transactions</div>
-        ${S.mempool && S.mempool.transactions.length > 0 ? `
-          <div class="table-wrap" style="margin-bottom:0"><table>
-            <tr><th>Hash</th><th>Sender</th></tr>
-            ${S.mempool.transactions.slice(0,5).map(tx => `
-              <tr><td class="mono">${shortAddr(tx.hash)}</td><td class="mono">${shortAddr(tx.sender)}</td></tr>
-            `).join('')}
-          </table></div>
-        ` : `<div style="text-align:center;color:var(--text3);padding:20px">No pending transactions</div>`}
-      </div>
-    </div>
-    <div class="card" style="margin-top:20px">
-      <div class="section-title">Node Info</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;font-size:.85em">
-        <div><span style="color:var(--text3)">Chain ID</span><br><strong>${escapeHtml(s.chain_id)}</strong></div>
-        <div><span style="color:var(--text3)">Node Address</span><br><strong class="mono copyable" onclick="copyText('${s.node_address}')">${shortAddr(s.node_address)}</strong></div>
-        <div><span style="color:var(--text3)">State Root</span><br><strong class="mono">${shortAddr(s.state_root)}</strong></div>
-        <div><span style="color:var(--text3)">Last Block Hash</span><br><strong class="mono">${shortAddr(s.last_block_hash)}</strong></div>
-        <div><span style="color:var(--text3)">Mempool Size</span><br><strong>${fmt(s.mempool_size)}</strong></div>
-        <div><span style="color:var(--text3)">Uptime</span><br><strong>${fmtUptime(s.uptime_ms)}</strong></div>
+        <div class="section-title">Quick Actions</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <a href="#send" onclick="navigate('send')" class="btn btn-primary" style="text-decoration:none;justify-content:center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Send BAUD
+          </a>
+          <a href="#accounts" onclick="navigate('accounts')" class="btn btn-secondary" style="text-decoration:none;justify-content:center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            Look Up Account
+          </a>
+          <a href="#wallet" onclick="navigate('wallet')" class="btn btn-secondary" style="text-decoration:none;justify-content:center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M16 14h.01M2 10h20"/></svg>
+            Generate New Keypair
+          </a>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:.8em;color:var(--text3)">
+          <strong style="color:var(--text2)">Your Address</strong><br>
+          <span class="mono copyable" onclick="copyText('${s.node_address}')" style="word-break:break-all;font-size:.9em">${s.node_address}</span>
+          <div style="margin-top:4px;color:var(--text3)">Click to copy • Share this to receive BAUD</div>
+        </div>
       </div>
     </div>
   </div>`;
@@ -569,8 +607,11 @@ function renderWallet() {
 
 // ── Send ──
 function renderSend() {
+  const acct = S.myAccount;
+  const currentNonce = acct ? acct.nonce : 0;
   return `<div class="page">
-    <div class="page-header"><h1>Send</h1><p>Create and submit transactions</p></div>
+    <div class="page-header"><h1>Send BAUD</h1><p>Transfer BAUD to any address or create a trustless escrow</p></div>
+    ${acct ? `<div class="alert alert-info" style="margin-bottom:16px">Your balance: <strong>${fmtBaud(acct.balance)} BAUD</strong> • Nonce: <strong>${acct.nonce}</strong></div>` : ''}
     <div class="tabs">
       <div class="tab active" onclick="switchSendTab(this,'transfer')">Transfer</div>
       <div class="tab" onclick="switchSendTab(this,'escrow')">Escrow</div>
@@ -589,9 +630,9 @@ function renderSend() {
             <input type="text" id="tx-to" placeholder="Hex-encoded address" class="mono">
           </div>
           <div class="form-group">
-            <label>Amount (quanta)</label>
-            <input type="number" id="tx-amount" placeholder="1000000 = 1 BAUD" min="1">
-            <div class="hint">1 BAUD = 1,000,000 quanta</div>
+            <label>Amount (BAUD)</label>
+            <input type="number" id="tx-amount" placeholder="e.g. 100" min="0.000001" step="any">
+            <div class="hint">Enter amount in BAUD (e.g. 100 BAUD). Decimals supported up to 6 places.</div>
           </div>
         </div>
         <div class="two-col">
@@ -828,15 +869,23 @@ function switchSendTab(el, tab) {
 async function submitTransfer() {
   const secret = $('#tx-secret').value.trim();
   const to = $('#tx-to').value.trim();
-  const amount = $('#tx-amount').value.trim();
+  const amountStr = $('#tx-amount').value.trim();
   const nonce = $('#tx-nonce').value.trim();
   const memo = $('#tx-memo').value.trim();
   const el = $('#tx-result');
 
-  if (!secret || !to || !amount || nonce === '') {
+  if (!secret || !to || !amountStr || nonce === '') {
     el.innerHTML = '<div class="alert alert-error">Please fill in all required fields</div>';
     return;
   }
+
+  // Convert BAUD to quanta (1 BAUD = 1,000,000 quanta)
+  const amountFloat = parseFloat(amountStr);
+  if (isNaN(amountFloat) || amountFloat <= 0) {
+    el.innerHTML = '<div class="alert alert-error">Please enter a valid amount</div>';
+    return;
+  }
+  const amountQuanta = Math.round(amountFloat * 1000000);
 
   el.innerHTML = '<div class="alert alert-info">Signing and submitting…</div>';
 
@@ -847,7 +896,7 @@ async function submitTransfer() {
       body: JSON.stringify({
         type: 'Transfer',
         secret, to,
-        amount: parseInt(amount),
+        amount: amountQuanta,
         nonce: parseInt(nonce),
         memo: memo || null,
         chain_id: S.status ? S.status.chain_id : 'baud-mainnet',
