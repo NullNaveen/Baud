@@ -588,13 +588,22 @@ struct KeygenQuery {
     derive: Option<String>,
 }
 
-async fn keygen(Query(q): Query<KeygenQuery>) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+async fn keygen(
+    Query(q): Query<KeygenQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
     match q.derive {
         Some(secret) => {
             let kp = KeyPair::from_secret_hex(&secret).map_err(|e| {
-                (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("invalid secret key: {e}") }))
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid secret key: {e}"),
+                    }),
+                )
             })?;
-            Ok(Json(serde_json::json!({ "address": kp.address().to_hex() })))
+            Ok(Json(
+                serde_json::json!({ "address": kp.address().to_hex() }),
+            ))
         }
         None => {
             let kp = KeyPair::generate();
@@ -635,28 +644,105 @@ async fn sign_and_submit(
     Json(req): Json<SignAndSubmitRequest>,
 ) -> Result<(StatusCode, Json<SubmitTxResponse>), (StatusCode, Json<ErrorResponse>)> {
     let kp = KeyPair::from_secret_hex(&req.secret).map_err(|e| {
-        (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("invalid secret key: {e}") }))
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: format!("invalid secret key: {e}"),
+            }),
+        )
     })?;
 
     let chain_id = req.chain_id.unwrap_or_else(|| state.chain_id.clone());
 
     let payload = match req.tx_type.as_str() {
         "Transfer" => {
-            let to_str = req.to.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'to' field".into() })))?;
-            let to_addr = Address::from_hex(&to_str).map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("invalid address: {e}") })))?;
-            let amount = req.amount.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'amount' field".into() })))?;
-            TxPayload::Transfer { to: to_addr, amount, memo: req.memo.map(|m| m.into_bytes()) }
+            let to_str = req.to.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'to' field".into(),
+                    }),
+                )
+            })?;
+            let to_addr = Address::from_hex(&to_str).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid address: {e}"),
+                    }),
+                )
+            })?;
+            let amount = req.amount.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'amount' field".into(),
+                    }),
+                )
+            })?;
+            TxPayload::Transfer {
+                to: to_addr,
+                amount,
+                memo: req.memo.map(|m| m.into_bytes()),
+            }
         }
         "EscrowCreate" => {
-            let recip_str = req.recipient.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'recipient' field".into() })))?;
-            let recip_addr = Address::from_hex(&recip_str).map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("invalid address: {e}") })))?;
-            let amount = req.amount.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'amount' field".into() })))?;
-            let preimage_str = req.preimage.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'preimage' field".into() })))?;
-            let deadline = req.deadline.ok_or_else(|| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: "missing 'deadline' field".into() })))?;
+            let recip_str = req.recipient.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'recipient' field".into(),
+                    }),
+                )
+            })?;
+            let recip_addr = Address::from_hex(&recip_str).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid address: {e}"),
+                    }),
+                )
+            })?;
+            let amount = req.amount.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'amount' field".into(),
+                    }),
+                )
+            })?;
+            let preimage_str = req.preimage.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'preimage' field".into(),
+                    }),
+                )
+            })?;
+            let deadline = req.deadline.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'deadline' field".into(),
+                    }),
+                )
+            })?;
             let hash_lock = Hash::digest(preimage_str.as_bytes());
-            TxPayload::EscrowCreate { recipient: recip_addr, amount, hash_lock, deadline }
+            TxPayload::EscrowCreate {
+                recipient: recip_addr,
+                amount,
+                hash_lock,
+                deadline,
+            }
         }
-        _ => return Err((StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("unsupported tx type: {}", req.tx_type) }))),
+        _ => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: format!("unsupported tx type: {}", req.tx_type),
+                }),
+            ))
+        }
     };
 
     let now = std::time::SystemTime::now()
@@ -677,16 +763,43 @@ async fn sign_and_submit(
     tx.signature = kp.sign(hash.as_bytes());
 
     // Validate
-    tx.validate_structure().map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("{e}") })))?;
+    tx.validate_structure().map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: format!("{e}"),
+            }),
+        )
+    })?;
     {
         let ws = state.world_state.read();
-        ws.validate_transaction(&tx, now).map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: format!("{e}") })))?;
+        ws.validate_transaction(&tx, now).map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: format!("{e}"),
+                }),
+            )
+        })?;
     }
 
-    let tx_hash = state.mempool.add(tx).map_err(|e| (StatusCode::CONFLICT, Json(ErrorResponse { error: format!("{e}") })))?;
+    let tx_hash = state.mempool.add(tx).map_err(|e| {
+        (
+            StatusCode::CONFLICT,
+            Json(ErrorResponse {
+                error: format!("{e}"),
+            }),
+        )
+    })?;
     state.tx_processed.fetch_add(1, Ordering::Relaxed);
 
-    Ok((StatusCode::ACCEPTED, Json(SubmitTxResponse { tx_hash: tx_hash.to_hex(), status: "pending".into() })))
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(SubmitTxResponse {
+            tx_hash: tx_hash.to_hex(),
+            status: "pending".into(),
+        }),
+    ))
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

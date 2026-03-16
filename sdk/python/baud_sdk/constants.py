@@ -1,7 +1,7 @@
 """Constants for the Baud token model."""
 
-# 1 BAUD = 10^18 quanta (smallest indivisible unit)
-QUANTA_PER_BAUD: int = 1_000_000_000_000_000_000
+# 1 BAUD = 10^6 quanta (smallest indivisible unit)
+QUANTA_PER_BAUD: int = 1_000_000
 
 # Structural limits
 MAX_TX_SIZE: int = 65_536

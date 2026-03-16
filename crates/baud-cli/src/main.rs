@@ -647,11 +647,19 @@ fn main() -> Result<()> {
         Commands::Dashboard { node } => {
             println!("Opening Baud dashboard at {node}");
             #[cfg(target_os = "windows")]
-            { let _ = std::process::Command::new("cmd").args(["/C", "start", &node]).spawn(); }
+            {
+                let _ = std::process::Command::new("cmd")
+                    .args(["/C", "start", &node])
+                    .spawn();
+            }
             #[cfg(target_os = "macos")]
-            { let _ = std::process::Command::new("open").arg(&node).spawn(); }
+            {
+                let _ = std::process::Command::new("open").arg(&node).spawn();
+            }
             #[cfg(target_os = "linux")]
-            { let _ = std::process::Command::new("xdg-open").arg(&node).spawn(); }
+            {
+                let _ = std::process::Command::new("xdg-open").arg(&node).spawn();
+            }
         }
     }
 

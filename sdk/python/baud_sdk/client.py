@@ -65,11 +65,11 @@ class BaudClient:
 
     def status(self) -> dict:
         """Get node status (chain_id, height, state_root, etc.)."""
-        return self._get("/status")
+        return self._get("/v1/status")
 
     def account(self, address: str) -> dict:
         """Get account balance, nonce, and agent metadata."""
-        return self._get(f"/account/{address}")
+        return self._get(f"/v1/account/{address}")
 
     def balance(self, address: str) -> int:
         """Get account balance in quanta."""
@@ -82,25 +82,25 @@ class BaudClient:
 
     def get_escrow(self, escrow_id: str) -> dict:
         """Get escrow details by ID."""
-        return self._get(f"/escrow/{escrow_id}")
+        return self._get(f"/v1/escrow/{escrow_id}")
 
     def get_tx(self, tx_hash: str) -> dict:
         """Look up a transaction by hash (from mempool)."""
-        return self._get(f"/tx/{tx_hash}")
+        return self._get(f"/v1/tx/{tx_hash}")
 
     def mempool(self) -> dict:
         """List pending transactions in the mempool."""
-        return self._get("/mempool")
+        return self._get("/v1/mempool")
 
     # ── Transaction submission ───────────────────────────────────────────
 
     def submit(self, tx: SignedTransaction) -> dict:
         """Submit a signed transaction to the node."""
-        return self._post("/tx", tx.to_submit_dict())
+        return self._post("/v1/tx", tx.to_submit_dict())
 
     def submit_raw(self, tx_dict: dict) -> dict:
         """Submit a raw transaction dict to the node."""
-        return self._post("/tx", tx_dict)
+        return self._post("/v1/tx", tx_dict)
 
     # ── High-level convenience methods ───────────────────────────────────
 
