@@ -35,6 +35,27 @@
             --pink: #ec4899;
         }
 
+        [data-theme="light"] {
+            --bg: #f8f9fc;
+            --bg-alt: #f0f1f5;
+            --surface: #ffffff;
+            --surface-hover: #f5f5fa;
+            --border: #e0e2e8;
+            --border-light: #d0d3dc;
+            --text: #1a1a2e;
+            --text-secondary: #4a4a65;
+            --muted: #6a6a80;
+            --primary: #7c3aed;
+            --primary-light: #6d28d9;
+            --primary-glow: rgba(139, 92, 246, 0.08);
+            --gold: #d4890c;
+            --gold-light: #b8740a;
+            --green: #16a34a;
+            --green-dim: #15803d;
+            --cyan: #0891b2;
+            --pink: #db2777;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
@@ -58,6 +79,10 @@
             background: rgba(5, 5, 16, 0.85);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid rgba(26, 26, 53, 0.5);
+        }
+        [data-theme="light"] nav {
+            background: rgba(248, 249, 252, 0.88);
+            border-bottom-color: rgba(0, 0, 0, 0.08);
         }
 
         .nav-inner {
@@ -499,6 +524,39 @@
         .kw { color: var(--pink); }
         .num { color: var(--gold-light); }
 
+        [data-theme="light"] .hero::before {
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.06) 0%, transparent 70%);
+        }
+        [data-theme="light"] pre {
+            background: #f6f5fa;
+            border-color: var(--border);
+        }
+        [data-theme="light"] .feature-card,
+        [data-theme="light"] .fair-item,
+        [data-theme="light"] .arch-card,
+        [data-theme="light"] .stat-item {
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+        [data-theme="light"] .btn-primary { box-shadow: 0 4px 20px rgba(124, 58, 237, 0.2); }
+        [data-theme="light"] .btn-gold { color: #fff; }
+        [data-theme="light"] .hero-badge { background: rgba(212, 137, 12, 0.08); border-color: rgba(212, 137, 12, 0.2); }
+        .theme-toggle-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'Inter', sans-serif;
+        }
+        .theme-toggle-btn:hover { border-color: var(--border-light); color: var(--text); }
+
         /* Architecture */
         .arch-grid {
             display: grid;
@@ -639,11 +697,21 @@
             .arch-grid { grid-template-columns: repeat(2, 1fr); }
             .fair-launch-grid { grid-template-columns: repeat(2, 1fr); }
             .nav-links { display: none; }
+            .mobile-theme-toggle { display: flex !important; }
             .footer-inner { flex-direction: column; gap: 16px; }
+        }
+        .mobile-theme-toggle {
+            display: none;
+            position: fixed;
+            top: 14px;
+            right: 16px;
+            z-index: 101;
+        }
         }
     </style>
 </head>
 <body>
+    <div class="mobile-theme-toggle"><button class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle theme"><span class="mobile-theme-icon">☀️</span></button></div>
     <!-- Navigation -->
     <nav>
         <div class="nav-inner">
@@ -673,6 +741,7 @@
                 <li><a href="#code">SDK</a></li>
                 <li><a href="#architecture">Architecture</a></li>
                 <li><a href="https://github.com/NullNaveen/Baud/blob/main/docs/whitepaper.md">Whitepaper</a></li>
+                <li><button class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle theme"><span id="theme-icon">☀️</span><span id="theme-label">Light</span></button></li>
                 <li><a href="https://github.com/NullNaveen/Baud" class="nav-cta">GitHub</a></li>
             </ul>
         </div>
@@ -1000,6 +1069,35 @@ baud-node \
         document.getElementById('tab-' + name).style.display = 'block';
         event.target.classList.add('active');
     }
+
+    function toggleTheme() {
+        var html = document.documentElement;
+        var current = html.getAttribute('data-theme');
+        var next = current === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('baud-theme', next);
+        updateThemeButton(next);
+    }
+
+    function updateThemeButton(theme) {
+        var icon = document.getElementById('theme-icon');
+        var label = document.getElementById('theme-label');
+        if (icon && label) {
+            icon.textContent = theme === 'light' ? '🌙' : '☀️';
+            label.textContent = theme === 'light' ? 'Dark' : 'Light';
+        }
+        document.querySelectorAll('.mobile-theme-icon').forEach(function(el) {
+            el.textContent = theme === 'light' ? '🌙' : '☀️';
+        });
+    }
+
+    (function() {
+        var saved = localStorage.getItem('baud-theme');
+        if (saved === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+            updateThemeButton('light');
+        }
+    })();
     </script>
 </body>
 </html>

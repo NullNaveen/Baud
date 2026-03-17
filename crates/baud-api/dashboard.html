@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Baud Dashboard</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='40' y2='40'%3E%3Cstop offset='0%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='10' fill='url(%23g)'/%3E%3Ctext x='50%25' y='54%25' text-anchor='middle' dominant-baseline='middle' font-size='20' font-weight='700' fill='%23fff' font-family='sans-serif'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='512' y2='512' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='160' y1='100' x2='360' y2='420' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23fff'/%3E%3Cstop offset='100%25' stop-color='%23e8deff'/%3E%3C/linearGradient%3E%3ClinearGradient id='s' x1='340' y1='120' x2='400' y2='180' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%2322c55e'/%3E%3Cstop offset='100%25' stop-color='%2316a34a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='96' fill='url(%23g)'/%3E%3Crect x='148' y='108' width='36' height='296' rx='18' fill='url(%23b)'/%3E%3Crect x='130' y='108' width='72' height='32' rx='8' fill='url(%23b)'/%3E%3Crect x='130' y='240' width='72' height='32' rx='8' fill='url(%23b)'/%3E%3Crect x='130' y='372' width='72' height='32' rx='8' fill='url(%23b)'/%3E%3Cpath d='M184 116H260C310 116 348 150 348 192C348 234 310 268 260 268H184' fill='none' stroke='url(%23b)' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M184 248H272C328 248 370 286 370 332C370 378 328 412 272 412H184' fill='none' stroke='url(%23b)' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='380' cy='130' r='22' fill='url(%23s)'/%3E%3Cpath d='M394 114C414 100 430 114 414 134' fill='none' stroke='%2322c55e' stroke-width='5' stroke-linecap='round' opacity='0.7'/%3E%3Cpath d='M406 102C434 82 458 102 434 130' fill='none' stroke='%2322c55e' stroke-width='4' stroke-linecap='round' opacity='0.45'/%3E%3C/svg%3E">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -204,7 +204,7 @@ tr:hover td{background:var(--card-hover)}
 
 <aside id="sidebar">
   <div class="logo">
-    <svg viewBox="0 0 40 40" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="40" y2="40"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs><rect width="40" height="40" rx="10" fill="url(#lg)"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="20" font-weight="700" fill="#fff" font-family="sans-serif">B</text></svg>
+    <svg viewBox="0 0 512 512" fill="none" style="width:36px;height:36px"><defs><linearGradient id="lg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient><linearGradient id="lb" x1="160" y1="100" x2="360" y2="420" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#e8deff"/></linearGradient><linearGradient id="ls" x1="340" y1="120" x2="400" y2="180" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#22c55e"/><stop offset="100%" stop-color="#16a34a"/></linearGradient></defs><rect width="512" height="512" rx="96" fill="url(#lg)"/><rect x="148" y="108" width="36" height="296" rx="18" fill="url(#lb)"/><rect x="130" y="108" width="72" height="32" rx="8" fill="url(#lb)"/><rect x="130" y="240" width="72" height="32" rx="8" fill="url(#lb)"/><rect x="130" y="372" width="72" height="32" rx="8" fill="url(#lb)"/><path d="M184 116 H260 C310 116 348 150 348 192 C348 234 310 268 260 268 H184" fill="none" stroke="url(#lb)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><path d="M184 248 H272 C328 248 370 286 370 332 C370 378 328 412 272 412 H184" fill="none" stroke="url(#lb)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><circle cx="380" cy="130" r="22" fill="url(#ls)"/><path d="M394 114 C414 100 430 114 414 134" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" opacity="0.7"/><path d="M406 102 C434 82 458 102 434 130" fill="none" stroke="#22c55e" stroke-width="4" stroke-linecap="round" opacity="0.45"/></svg>
     <span>Baud</span>
   </div>
   <nav id="nav">
@@ -1207,10 +1207,6 @@ async function submitAgentRegister() {
   } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
 }
 
-    el.innerHTML = resp.ok ? `<div class="alert alert-success">Agent registered!<br><span class="mono">${data.tx_hash}</span></div>` : `<div class="alert alert-error">${escapeHtml(data.error)}</div>`;
-  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
-}
-
 // ── Help ──
 function renderHelp() {
   const terms = [
@@ -1241,7 +1237,7 @@ function renderHelp() {
     { term: 'GitHub Deployments', simple: 'Automatic publishing of the Baud website to GitHub Pages every time we push changes.', more: 'The website at https://nullnaveen.github.io/Baud/ is automatically updated when code is pushed. No manual upload needed.' },
   ];
 
-  return \`<div class="page">
+  return `<div class="page">
     <div class="page-header"><h1>Help & Glossary</h1><p>Everything explained in plain English. Click any term to expand.</p></div>
     <div class="card" style="margin-bottom:20px">
       <div class="section-title">Quick Start Guide</div>
@@ -1257,16 +1253,16 @@ function renderHelp() {
       <div class="section-title">Glossary — Technical Terms Explained</div>
       <p style="color:var(--text3);font-size:.85em;margin-bottom:16px">Click any term to see a simple explanation. Click again for more detail.</p>
       <div id="glossary-list">
-        \${terms.map((t, i) => \`
+        ${terms.map((t, i) => `
           <div class="glossary-item" style="border-bottom:1px solid var(--bg3);padding:12px 0;cursor:pointer" onclick="toggleGlossary(this)">
             <div style="display:flex;justify-content:space-between;align-items:center">
-              <strong style="color:var(--primary);font-size:1.05em">\${t.term}</strong>
+              <strong style="color:var(--primary);font-size:1.05em">${t.term}</strong>
               <svg class="glossary-arrow" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" width="16" height="16" style="transition:transform .2s"><path d="M6 9l6 6 6-6"/></svg>
             </div>
-            <div class="glossary-simple" style="display:none;margin-top:8px;color:var(--text2);font-size:.93em;line-height:1.6">\${t.simple}</div>
-            <div class="glossary-more" style="display:none;margin-top:8px;padding:10px;background:var(--bg1);border-radius:8px;color:var(--text3);font-size:.88em;line-height:1.6">\${t.more}</div>
+            <div class="glossary-simple" style="display:none;margin-top:8px;color:var(--text2);font-size:.93em;line-height:1.6">${t.simple}</div>
+            <div class="glossary-more" style="display:none;margin-top:8px;padding:10px;background:var(--bg1);border-radius:8px;color:var(--text3);font-size:.88em;line-height:1.6">${t.more}</div>
           </div>
-        \`).join('')}
+        `).join('')}
       </div>
     </div>
     <div class="card" style="margin-top:20px">
@@ -1286,7 +1282,7 @@ function renderHelp() {
         A: Close the node. Mining happens automatically while the node is running. You can stop via the "Stop Baud Node" shortcut in the Start Menu, or end the baud-node process in Task Manager.</p>
       </div>
     </div>
-  </div>\`;
+  </div>`;
 }
 
 function toggleGlossary(el) {
