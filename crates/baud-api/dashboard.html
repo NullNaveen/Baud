@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Baud Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='40' y2='40'%3E%3Cstop offset='0%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='10' fill='url(%23g)'/%3E%3Ctext x='50%25' y='54%25' text-anchor='middle' dominant-baseline='middle' font-size='20' font-weight='700' fill='%23fff' font-family='sans-serif'%3EB%3C/text%3E%3C/svg%3E">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -243,6 +244,10 @@ tr:hover td{background:var(--card-hover)}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Agents
     </a>
+    <a href="#help" data-page="help">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Help
+    </a>
   </nav>
   <div class="sidebar-footer">
     <div style="display:flex;align-items:center;gap:6px;font-size:.82em;color:var(--text3)">
@@ -402,6 +407,7 @@ function renderPage() {
     case 'node': c.innerHTML = renderNode(); break;
     case 'explorer': c.innerHTML = renderExplorer(); break;
     case 'agents': c.innerHTML = renderAgents(); break;
+    case 'help': c.innerHTML = renderHelp(); break;
     default: c.innerHTML = renderDashboard();
   }
 }
@@ -1199,6 +1205,104 @@ async function submitAgentRegister() {
     const data = await resp.json();
     el.innerHTML = resp.ok ? `<div class="alert alert-success">Agent registered!<br><span class="mono">${data.tx_hash}</span></div>` : `<div class="alert alert-error">${escapeHtml(data.error)}</div>`;
   } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+    el.innerHTML = resp.ok ? `<div class="alert alert-success">Agent registered!<br><span class="mono">${data.tx_hash}</span></div>` : `<div class="alert alert-error">${escapeHtml(data.error)}</div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+// ── Help ──
+function renderHelp() {
+  const terms = [
+    { term: 'Blockchain', simple: 'A shared digital notebook that records every transaction. Every computer on the network has a copy, so nobody can cheat.', more: 'Think of it like a Google Doc that everyone can read but nobody can secretly edit. Each "page" (block) is linked to the previous one with math, creating an unbreakable chain.' },
+    { term: 'Block', simple: 'A batch of transactions grouped together. A new block is created roughly every second in Baud.', more: 'Like a page in the notebook. Each page is numbered (block height) and sealed so it can\'t be changed afterward.' },
+    { term: 'Mining', simple: 'The process of creating new blocks and earning BAUD as a reward. Your node automatically mines when it\'s running.', more: 'Unlike Bitcoin, Baud mining doesn\'t waste electricity. Your computer just takes turns with other validators to create blocks. The reward is currently 500 BAUD per block and halves every 1 million blocks.' },
+    { term: 'Node', simple: 'A computer running the Baud software. Your node keeps a copy of all transactions and participates in creating blocks.', more: 'When you run baud-node (or click "Baud Node" in the Start Menu), your computer becomes a node on the network.' },
+    { term: 'Secret Key', simple: 'A 64-character password that controls your BAUD. Anyone who has it can spend your money. NEVER share it.', more: 'Generated using Ed25519 cryptography. Your secret key mathematically derives your address (public key). There is no "forgot password" — lose it and your funds are gone forever.' },
+    { term: 'Address', simple: 'Your "account number" — a 64-character identifier where people send BAUD to you. Safe to share publicly.', more: 'Derived from your secret key using one-way math. You can\'t reverse-engineer the secret key from the address.' },
+    { term: 'Nonce', simple: 'A transaction counter that prevents replay attacks. It starts at 0 and increases by 1 with each transaction you make.', more: 'If your nonce is currently 5, your next transaction must use nonce 5. The network rejects transactions with wrong nonces, preventing someone from resending your old transactions.' },
+    { term: 'Transaction', simple: 'An instruction like "send 100 BAUD from me to this address." Must be signed with your secret key.', more: 'Every transaction is broadcast to the network, included in a block, and permanently recorded on the blockchain.' },
+    { term: 'Escrow', simple: 'A "safe deposit box" for a deal. BAUD is locked up and only released when certain conditions are met.', more: 'Example: You pay an AI agent to do work. The BAUD is locked in escrow. If the agent delivers (proves it with a secret code), the BAUD is released to them. If the deadline passes without delivery, you get a refund. Neither party needs to trust the other.' },
+    { term: 'Hash Lock / HTLC', simple: 'A math puzzle that locks an escrow. The recipient must reveal a secret word (preimage) whose hash matches the lock to claim the funds.', more: 'HTLC stands for Hash Time-Locked Contract. It combines a hash-based puzzle (the lock) with a time deadline (the refund window). Used for trustless payments between strangers.' },
+    { term: 'Preimage', simple: 'The secret word/code used to unlock an escrow. Only the recipient knows it.', more: 'The sender creates a hash of the preimage and puts it in the escrow. The recipient reveals the preimage to claim the funds. This is how escrows remain trustless.' },
+    { term: 'Quanta', simple: 'The smallest unit of BAUD. 1 BAUD = 10^18 quanta (like cents to dollars, but much smaller).', more: 'All internal calculations use quanta for precision. When you see huge numbers in the API (like 500000000000000000000), divide by 10^18 to get the BAUD amount.' },
+    { term: 'Ed25519', simple: 'The type of encryption/signing Baud uses. It\'s fast, secure, and used by Signal, SSH, and Tor.', more: 'A digital signature algorithm using elliptic curve cryptography (Curve25519). Creates 32-byte keys that would take billions of years to crack.' },
+    { term: 'AES-256-GCM', simple: 'Encryption used to protect your wallet file. Like a super-strong padlock on your key storage.', more: 'AES-256 is the encryption standard used by governments and banks. GCM mode adds authentication — it not only encrypts your data but also detects if anyone tampered with it. Used with Argon2id key derivation to turn your password into the encryption key.' },
+    { term: 'Validator', simple: 'A node that participates in creating blocks. If your node is running and has a secret key, it\'s a validator.', more: 'Validators take turns proposing new blocks. Baud uses round-robin leader selection — each validator gets a turn in order.' },
+    { term: 'Mempool', simple: 'A waiting room for transactions. When you submit a transaction, it goes here until the next block includes it.', more: 'Usually transactions only stay in the mempool for 1-2 seconds before being included in the next block.' },
+    { term: 'State Root', simple: 'A mathematical fingerprint of the entire blockchain state (all balances, escrows, etc).', more: 'A single hash that summarizes every account balance, escrow, and piece of data on the chain. If even one number changes, the state root changes completely. Used to verify data integrity.' },
+    { term: 'Consensus', simple: 'The process by which all nodes agree on the current state of the blockchain.', more: 'Baud uses BFT (Byzantine Fault Tolerant) consensus — the network works correctly even if up to ⅓ of validators are dishonest or offline.' },
+    { term: 'Halving', simple: 'The mining reward cuts in half at regular intervals, making BAUD scarcer over time. Happens every 1 million blocks.', more: 'Era 0: 500 BAUD/block → Era 1: 250 → Era 2: 125 → ... After 21 halvings, no more BAUD will be created. This is similar to Bitcoin\'s supply schedule.' },
+    { term: 'Agent Registration', simple: 'Registering your AI agent\'s name, URL, and skills on the blockchain so other agents can find and pay it.', more: 'Creates a permanent, public record of your agent\'s identity. Other agents can look up your address and see what services you offer.' },
+    { term: 'Chain ID', simple: 'A unique name for the network (like "baud-mainnet"). Prevents transactions meant for one network from working on another.', more: 'Included in every transaction signature. A testnet transaction cannot be replayed on mainnet because the chain IDs are different.' },
+    { term: 'P2P / Peer-to-Peer', simple: 'Computers talking directly to each other without a central server. How Baud nodes share blocks and transactions.', more: 'Baud uses WebSocket connections between nodes. Each node gossips new blocks and transactions to its peers.' },
+    { term: 'Rate Limiting', simple: 'Protection against spam. The API allows 60 requests in a burst and 20 per second sustained.', more: 'Uses a token-bucket algorithm. Prevents anyone from overwhelming the node with excessive requests.' },
+    { term: 'CI (Continuous Integration)', simple: 'Automatic testing that runs every time code is pushed to GitHub. Makes sure changes don\'t break anything.', more: 'Our CI runs `cargo test` and `cargo clippy` on every push. If tests fail, the badge turns red. It catches bugs before they reach users.' },
+    { term: 'GitHub Deployments', simple: 'Automatic publishing of the Baud website to GitHub Pages every time we push changes.', more: 'The website at https://nullnaveen.github.io/Baud/ is automatically updated when code is pushed. No manual upload needed.' },
+  ];
+
+  return \`<div class="page">
+    <div class="page-header"><h1>Help & Glossary</h1><p>Everything explained in plain English. Click any term to expand.</p></div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">Quick Start Guide</div>
+      <div style="line-height:1.8;font-size:.95em">
+        <p><strong>1. Your node is already running</strong> — if you can see this page, your Baud node is working. It's mining BAUD every second.</p>
+        <p><strong>2. Check your balance</strong> — Go to the <a href="#dashboard" onclick="navigate('dashboard')" style="color:var(--primary)">Dashboard</a> to see how much BAUD you've mined.</p>
+        <p><strong>3. Send BAUD</strong> — Go to <a href="#send" onclick="navigate('send')" style="color:var(--primary)">Send</a>, enter your secret key, the recipient's address, amount, and nonce. Click Send.</p>
+        <p><strong>4. Your secret key</strong> — This is your password to your funds. It's the 64-character hex string in your start-node script. <strong style="color:var(--red)">Never share it.</strong></p>
+        <p><strong>5. Explore</strong> — Use <a href="#explorer" onclick="navigate('explorer')" style="color:var(--primary)">Explorer</a> to look up transactions and escrows.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Glossary — Technical Terms Explained</div>
+      <p style="color:var(--text3);font-size:.85em;margin-bottom:16px">Click any term to see a simple explanation. Click again for more detail.</p>
+      <div id="glossary-list">
+        \${terms.map((t, i) => \`
+          <div class="glossary-item" style="border-bottom:1px solid var(--bg3);padding:12px 0;cursor:pointer" onclick="toggleGlossary(this)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <strong style="color:var(--primary);font-size:1.05em">\${t.term}</strong>
+              <svg class="glossary-arrow" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" width="16" height="16" style="transition:transform .2s"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="glossary-simple" style="display:none;margin-top:8px;color:var(--text2);font-size:.93em;line-height:1.6">\${t.simple}</div>
+            <div class="glossary-more" style="display:none;margin-top:8px;padding:10px;background:var(--bg1);border-radius:8px;color:var(--text3);font-size:.88em;line-height:1.6">\${t.more}</div>
+          </div>
+        \`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px">
+      <div class="section-title">Frequently Asked Questions</div>
+      <div style="line-height:1.8;font-size:.93em">
+        <p><strong>Q: Can I have multiple secret keys?</strong><br>
+        A: Yes, each key creates a completely separate identity with its own address and balance. Think of each key as a different bank account. Your main key (the validator key) is the one earning mining rewards.</p>
+        <p style="margin-top:12px"><strong>Q: What happens if I lose my secret key?</strong><br>
+        A: All BAUD at that address is lost forever. There is no recovery mechanism. Always back up your key.</p>
+        <p style="margin-top:12px"><strong>Q: Are there transaction fees?</strong><br>
+        A: No. Baud transactions are completely free. Rate limiting prevents spam instead of fees.</p>
+        <p style="margin-top:12px"><strong>Q: How long until my BAUD is confirmed?</strong><br>
+        A: About 1-2 seconds. Transactions enter the mempool and are included in the very next block.</p>
+        <p style="margin-top:12px"><strong>Q: What is escrow used for?</strong><br>
+        A: Escrow lets two parties make a trustless deal. BAUD is locked and only released when conditions are met (like the recipient proving they completed a task). If the deadline passes without completion, the sender gets a refund.</p>
+        <p style="margin-top:12px"><strong>Q: How do I stop mining?</strong><br>
+        A: Close the node. Mining happens automatically while the node is running. You can stop via the "Stop Baud Node" shortcut in the Start Menu, or end the baud-node process in Task Manager.</p>
+      </div>
+    </div>
+  </div>\`;
+}
+
+function toggleGlossary(el) {
+  const simple = el.querySelector('.glossary-simple');
+  const more = el.querySelector('.glossary-more');
+  const arrow = el.querySelector('.glossary-arrow');
+  if (simple.style.display === 'none') {
+    simple.style.display = 'block';
+    arrow.style.transform = 'rotate(180deg)';
+  } else if (more.style.display === 'none') {
+    more.style.display = 'block';
+  } else {
+    simple.style.display = 'none';
+    more.style.display = 'none';
+    arrow.style.transform = '';
+  }
 }
 
 // ─── Init ───────────────────────────────────────────────────────────────────
