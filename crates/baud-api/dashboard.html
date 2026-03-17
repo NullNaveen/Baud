@@ -235,6 +235,14 @@ tr:hover td{background:var(--card-hover)}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
       Node Info
     </a>
+    <a href="#explorer" data-page="explorer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Explorer
+    </a>
+    <a href="#agents" data-page="agents">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Agents
+    </a>
   </nav>
   <div class="sidebar-footer">
     <div style="display:flex;align-items:center;gap:6px;font-size:.82em;color:var(--text3)">
@@ -263,6 +271,7 @@ const S = {
 };
 const API = location.origin;
 const TOTAL_SUPPLY = 1000000000; // 1 billion BAUD
+const QUANTA_PER_BAUD = 1000000000000000000n; // 10^18
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const $ = s => document.querySelector(s);
@@ -276,10 +285,11 @@ function fmt(n) {
 function fmtBaud(quanta) {
   if (!quanta) return '0';
   const b = BigInt(quanta);
-  const whole = b / 1000000n;
-  const frac = b % 1000000n;
+  const whole = b / QUANTA_PER_BAUD;
+  const frac = b % QUANTA_PER_BAUD;
   if (frac === 0n) return whole.toLocaleString();
-  return `${whole.toLocaleString()}.${frac.toString().padStart(6,'0').replace(/0+$/,'')}`;
+  const fracStr = frac.toString().padStart(18,'0').replace(/0+$/,'');
+  return `${whole.toLocaleString()}.${fracStr.slice(0,6)}`;
 }
 
 function fmtUptime(ms) {
@@ -390,6 +400,8 @@ function renderPage() {
     case 'accounts': c.innerHTML = renderAccounts(); break;
     case 'mempool': c.innerHTML = renderMempool(); break;
     case 'node': c.innerHTML = renderNode(); break;
+    case 'explorer': c.innerHTML = renderExplorer(); break;
+    case 'agents': c.innerHTML = renderAgents(); break;
     default: c.innerHTML = renderDashboard();
   }
 }
@@ -406,7 +418,7 @@ function renderDashboard() {
 
   // Calculate balance info
   const myBalanceBaud = acct ? fmtBaud(acct.balance) : '—';
-  const myBalanceNum = acct ? Number(BigInt(acct.balance) / 1000000n) : 0;
+  const myBalanceNum = acct ? Number(BigInt(acct.balance) / QUANTA_PER_BAUD) : 0;
   const myPctOfSupply = myBalanceNum > 0 ? ((myBalanceNum / TOTAL_SUPPLY) * 100) : 0;
   const myPctStr = myPctOfSupply >= 0.01 ? myPctOfSupply.toFixed(2) : myPctOfSupply.toFixed(4);
 
@@ -879,13 +891,17 @@ async function submitTransfer() {
     return;
   }
 
-  // Convert BAUD to quanta (1 BAUD = 1,000,000 quanta)
+  // Convert BAUD to quanta (1 BAUD = 10^18 quanta)
   const amountFloat = parseFloat(amountStr);
   if (isNaN(amountFloat) || amountFloat <= 0) {
     el.innerHTML = '<div class="alert alert-error">Please enter a valid amount</div>';
     return;
   }
-  const amountQuanta = Math.round(amountFloat * 1000000);
+  // Use BigInt for precision: split into whole and fractional BAUD
+  const wholeBaud = BigInt(Math.floor(amountFloat));
+  const fracPart = amountFloat - Math.floor(amountFloat);
+  const fracQuanta = BigInt(Math.round(fracPart * 1e18));
+  const amountQuanta = (wholeBaud * QUANTA_PER_BAUD + fracQuanta).toString();
 
   el.innerHTML = '<div class="alert alert-info">Signing and submitting…</div>';
 
@@ -951,6 +967,238 @@ async function submitEscrow() {
   } catch(e) {
     el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`;
   }
+}
+
+// ── Explorer ──
+function renderExplorer() {
+  return `<div class="page">
+    <div class="page-header"><h1>Explorer</h1><p>Look up transactions and escrows by their ID</p></div>
+    <div class="two-col">
+      <div class="card">
+        <div class="section-title">Transaction Lookup</div>
+        <div style="display:flex;gap:12px;align-items:end">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label>Transaction Hash</label>
+            <input type="text" id="tx-lookup-hash" placeholder="Enter transaction hash" class="mono"
+                   onkeydown="if(event.key==='Enter')lookupTx()">
+          </div>
+          <button class="btn btn-primary" onclick="lookupTx()" style="height:42px">Look Up</button>
+        </div>
+        <div id="tx-lookup-result" style="margin-top:16px"></div>
+      </div>
+      <div class="card">
+        <div class="section-title">Escrow Lookup</div>
+        <div style="display:flex;gap:12px;align-items:end">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label>Escrow ID</label>
+            <input type="text" id="escrow-lookup-id" placeholder="Enter escrow ID" class="mono"
+                   onkeydown="if(event.key==='Enter')lookupEscrow()">
+          </div>
+          <button class="btn btn-primary" onclick="lookupEscrow()" style="height:42px">Look Up</button>
+        </div>
+        <div id="escrow-lookup-result" style="margin-top:16px"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px">
+      <div class="section-title">Escrow Actions</div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchEscrowActionTab(this,'release')">Release Escrow</div>
+        <div class="tab" onclick="switchEscrowActionTab(this,'refund')">Refund Escrow</div>
+      </div>
+      <div id="escrow-release-tab">
+        <p style="color:var(--text2);font-size:.9em;margin-bottom:12px">Release an escrow by providing the secret preimage. Only the recipient can release.</p>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Your Secret Key (Recipient)</label>
+            <input type="password" id="erel-secret" placeholder="Hex-encoded secret key">
+          </div>
+          <div class="form-group">
+            <label>Escrow ID</label>
+            <input type="text" id="erel-escrow-id" placeholder="Hex escrow ID" class="mono">
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Preimage (hash lock secret)</label>
+            <input type="text" id="erel-preimage" placeholder="The secret string">
+          </div>
+          <div class="form-group">
+            <label>Nonce</label>
+            <input type="number" id="erel-nonce" placeholder="Your nonce" min="0">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="submitEscrowRelease()">Release Escrow</button>
+        <div id="erel-result" style="margin-top:16px"></div>
+      </div>
+      <div id="escrow-refund-tab" style="display:none">
+        <p style="color:var(--text2);font-size:.9em;margin-bottom:12px">Refund an escrow after its deadline has passed. Only the sender can refund.</p>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Your Secret Key (Sender)</label>
+            <input type="password" id="eref-secret" placeholder="Hex-encoded secret key">
+          </div>
+          <div class="form-group">
+            <label>Escrow ID</label>
+            <input type="text" id="eref-escrow-id" placeholder="Hex escrow ID" class="mono">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Nonce</label>
+          <input type="number" id="eref-nonce" placeholder="Your nonce" min="0">
+        </div>
+        <button class="btn btn-primary" onclick="submitEscrowRefund()">Refund Escrow</button>
+        <div id="eref-result" style="margin-top:16px"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function switchEscrowActionTab(el, tab) {
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  $('#escrow-release-tab').style.display = tab === 'release' ? '' : 'none';
+  $('#escrow-refund-tab').style.display = tab === 'refund' ? '' : 'none';
+}
+
+async function lookupTx() {
+  const hash = $('#tx-lookup-hash').value.trim();
+  const el = $('#tx-lookup-result');
+  if (!hash) { el.innerHTML = '<div class="alert alert-error">Enter a transaction hash</div>'; return; }
+  el.innerHTML = '<div class="alert alert-info">Looking up…</div>';
+  try {
+    const resp = await fetch(API + '/v1/tx/' + hash);
+    if (!resp.ok) { const d = await resp.json(); el.innerHTML = `<div class="alert alert-error">${escapeHtml(d.error||'Not found')}</div>`; return; }
+    const data = await resp.json();
+    el.innerHTML = `<div class="card" style="background:var(--bg1)">
+      <table><tbody>
+        <tr><td style="color:var(--text3);width:120px">Hash</td><td class="mono" style="word-break:break-all">${escapeHtml(data.hash || hash)}</td></tr>
+        <tr><td style="color:var(--text3)">Sender</td><td class="mono" style="word-break:break-all">${escapeHtml(data.sender)}</td></tr>
+        <tr><td style="color:var(--text3)">Nonce</td><td>${data.nonce}</td></tr>
+        <tr><td style="color:var(--text3)">Type</td><td><span class="badge badge-primary">${escapeHtml(data.tx_type || data.payload_type || 'Unknown')}</span></td></tr>
+        <tr><td style="color:var(--text3)">Timestamp</td><td>${new Date(data.timestamp).toLocaleString()}</td></tr>
+      </tbody></table>
+    </div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+async function lookupEscrow() {
+  const id = $('#escrow-lookup-id').value.trim();
+  const el = $('#escrow-lookup-result');
+  if (!id) { el.innerHTML = '<div class="alert alert-error">Enter an escrow ID</div>'; return; }
+  el.innerHTML = '<div class="alert alert-info">Looking up…</div>';
+  try {
+    const resp = await fetch(API + '/v1/escrow/' + id);
+    if (!resp.ok) { const d = await resp.json(); el.innerHTML = `<div class="alert alert-error">${escapeHtml(d.error||'Not found')}</div>`; return; }
+    const data = await resp.json();
+    const statusColor = data.status === 'Active' ? 'var(--green)' : data.status === 'Released' ? 'var(--primary)' : 'var(--text3)';
+    el.innerHTML = `<div class="card" style="background:var(--bg1)">
+      <table><tbody>
+        <tr><td style="color:var(--text3);width:120px">Escrow ID</td><td class="mono" style="word-break:break-all">${escapeHtml(data.id || id)}</td></tr>
+        <tr><td style="color:var(--text3)">Status</td><td><strong style="color:${statusColor}">${escapeHtml(data.status)}</strong></td></tr>
+        <tr><td style="color:var(--text3)">Sender</td><td class="mono" style="word-break:break-all">${escapeHtml(data.sender)}</td></tr>
+        <tr><td style="color:var(--text3)">Recipient</td><td class="mono" style="word-break:break-all">${escapeHtml(data.recipient)}</td></tr>
+        <tr><td style="color:var(--text3)">Amount</td><td><strong>${fmtBaud(data.amount)} BAUD</strong></td></tr>
+        <tr><td style="color:var(--text3)">Deadline</td><td>${data.deadline}</td></tr>
+      </tbody></table>
+    </div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+async function submitEscrowRelease() {
+  const secret = $('#erel-secret').value.trim();
+  const escrow_id = $('#erel-escrow-id').value.trim();
+  const preimage = $('#erel-preimage').value.trim();
+  const nonce = $('#erel-nonce').value.trim();
+  const el = $('#erel-result');
+  if (!secret || !escrow_id || !preimage || nonce === '') { el.innerHTML = '<div class="alert alert-error">Fill in all fields</div>'; return; }
+  el.innerHTML = '<div class="alert alert-info">Signing and submitting…</div>';
+  try {
+    const resp = await fetch(API + '/v1/sign-and-submit', { method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'EscrowRelease', secret, escrow_id, preimage, nonce: parseInt(nonce), chain_id: S.status ? S.status.chain_id : 'baud-mainnet' })
+    });
+    const data = await resp.json();
+    el.innerHTML = resp.ok ? `<div class="alert alert-success">Escrow released!<br><span class="mono">${data.tx_hash}</span></div>` : `<div class="alert alert-error">${escapeHtml(data.error)}</div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+async function submitEscrowRefund() {
+  const secret = $('#eref-secret').value.trim();
+  const escrow_id = $('#eref-escrow-id').value.trim();
+  const nonce = $('#eref-nonce').value.trim();
+  const el = $('#eref-result');
+  if (!secret || !escrow_id || nonce === '') { el.innerHTML = '<div class="alert alert-error">Fill in all fields</div>'; return; }
+  el.innerHTML = '<div class="alert alert-info">Signing and submitting…</div>';
+  try {
+    const resp = await fetch(API + '/v1/sign-and-submit', { method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'EscrowRefund', secret, escrow_id, nonce: parseInt(nonce), chain_id: S.status ? S.status.chain_id : 'baud-mainnet' })
+    });
+    const data = await resp.json();
+    el.innerHTML = resp.ok ? `<div class="alert alert-success">Escrow refunded!<br><span class="mono">${data.tx_hash}</span></div>` : `<div class="alert alert-error">${escapeHtml(data.error)}</div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+// ── Agents ──
+function renderAgents() {
+  return `<div class="page">
+    <div class="page-header"><h1>Agent Registration</h1><p>Register your AI agent identity on the Baud network</p></div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">What is Agent Registration?</div>
+      <div style="font-size:.9em;color:var(--text2);line-height:1.7">
+        <p>AI agents on the Baud network can register a <strong>name</strong>, <strong>endpoint URL</strong>, and <strong>capabilities</strong> tied to their address. This makes your agent discoverable and identifiable to other agents on the network.</p>
+        <p style="margin-top:8px">Once registered, anyone looking up your address will see your agent's metadata. This is how agents find each other for services, negotiations, and payments.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Register Agent</div>
+      <div class="form-group">
+        <label>Your Secret Key</label>
+        <input type="password" id="agent-secret" placeholder="Hex-encoded secret key">
+        <div class="hint">The address derived from this key will become the agent's identity</div>
+      </div>
+      <div class="two-col">
+        <div class="form-group">
+          <label>Agent Name</label>
+          <input type="text" id="agent-name" placeholder="e.g. llm-inference-v2" maxlength="64">
+        </div>
+        <div class="form-group">
+          <label>Endpoint URL</label>
+          <input type="text" id="agent-endpoint" placeholder="https://api.myagent.ai/v2">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Capabilities (comma-separated)</label>
+        <input type="text" id="agent-capabilities" placeholder="e.g. llm, inference, vision, code-review">
+        <div class="hint">Comma-separated list of what your agent can do</div>
+      </div>
+      <div class="form-group">
+        <label>Nonce</label>
+        <input type="number" id="agent-nonce" placeholder="Your account nonce" min="0">
+      </div>
+      <button class="btn btn-primary" onclick="submitAgentRegister()">Register Agent</button>
+      <div id="agent-result" style="margin-top:16px"></div>
+    </div>
+  </div>`;
+}
+
+async function submitAgentRegister() {
+  const secret = $('#agent-secret').value.trim();
+  const name = $('#agent-name').value.trim();
+  const endpoint = $('#agent-endpoint').value.trim();
+  const capStr = $('#agent-capabilities').value.trim();
+  const nonce = $('#agent-nonce').value.trim();
+  const el = $('#agent-result');
+
+  if (!secret || !name || nonce === '') { el.innerHTML = '<div class="alert alert-error">Secret key, name, and nonce are required</div>'; return; }
+  const capabilities = capStr ? capStr.split(',').map(c => c.trim()).filter(c => c) : [];
+
+  el.innerHTML = '<div class="alert alert-info">Signing and submitting…</div>';
+  try {
+    const resp = await fetch(API + '/v1/sign-and-submit', { method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'AgentRegister', secret, name, endpoint: endpoint || '', capabilities, nonce: parseInt(nonce), chain_id: S.status ? S.status.chain_id : 'baud-mainnet' })
+    });
+    const data = await resp.json();
+    el.innerHTML = resp.ok ? `<div class="alert alert-success">Agent registered!<br><span class="mono">${data.tx_hash}</span></div>` : `<div class="alert alert-error">${escapeHtml(data.error)}</div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
 }
 
 // ─── Init ───────────────────────────────────────────────────────────────────

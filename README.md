@@ -181,17 +181,21 @@ Default listen address: `http://0.0.0.0:8080`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/status` | Node status (height, chain ID, validator count) |
-| `GET` | `/account/{address}` | Account balance, nonce, agent metadata |
-| `POST` | `/tx` | Submit a signed transaction |
-| `GET` | `/tx/{hash}` | Look up transaction by hash |
-| `GET` | `/escrow/{id}` | Look up escrow contract by ID |
-| `GET` | `/mempool` | List pending transactions |
+| `GET` | `/v1/status` | Node status (height, chain ID, validator count) |
+| `GET` | `/v1/account/{address}` | Account balance, nonce, agent metadata |
+| `POST` | `/v1/tx` | Submit a signed transaction |
+| `GET` | `/v1/tx/{hash}` | Look up transaction by hash |
+| `GET` | `/v1/escrow/{id}` | Look up escrow contract by ID |
+| `GET` | `/v1/mempool` | List pending transactions |
+| `POST` | `/v1/keygen` | Generate a new Ed25519 keypair |
+| `POST` | `/v1/sign-and-submit` | Sign & submit a transaction in one step |
+| `GET` | `/v1/mining` | Current mining status and configuration |
+| `GET` | `/dashboard` | Web dashboard (browser UI) |
 
 ### Submit Transaction
 
 ```bash
-curl -X POST http://localhost:8080/tx \
+curl -X POST http://localhost:8080/v1/tx \
   -H "Content-Type: application/json" \
   -d @signed_tx.json
 ```
@@ -199,7 +203,7 @@ curl -X POST http://localhost:8080/tx \
 ### Query Account
 
 ```bash
-curl http://localhost:8080/account/<hex-address>
+curl http://localhost:8080/v1/account/<hex-address>
 ```
 
 ## Running a Node
@@ -270,6 +274,24 @@ Ready-to-use examples in `examples/`:
 - **`langchain_agent.py`** — LangChain tools for balance, send, and escrow
 - **`crewai_team.py`** — CrewAI buyer/seller team with automated payment flow
 - **`autonomous_agent.py`** — Minimal standalone agent with identity management
+
+## Web Dashboard
+
+Start the node and open `http://localhost:8080/dashboard` in a browser. The dashboard provides a full GUI for all operations — no terminal needed:
+
+- **Dashboard** — Balance overview, network stats, recent transactions
+- **Mining** — Live mining status, block height, hash rate
+- **Wallet** — Generate new keypairs, view secret/public key
+- **Send** — Transfer BAUD to any address (sign-and-submit in one step)
+- **Accounts** — Look up any account's balance, nonce, and agent metadata
+- **Mempool** — View pending transactions with auto-refresh
+- **Node Info** — Chain ID, peer count, validator status
+- **Explorer** — Look up transactions and escrows by hash/ID; release & refund escrows
+- **Agents** — Register your AI agent's name, endpoint, and capabilities on-chain
+
+### Windows Quick Start
+
+Run `scripts\start-node.bat` or search "Baud" in the Start Menu (after running `scripts\install-shortcuts.bat`). The node starts and the dashboard opens automatically in your default browser.
 
 ## Block Explorer
 

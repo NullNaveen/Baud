@@ -249,6 +249,7 @@ pub fn build_router(state: AppState) -> Router {
 pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Router {
     Router::new()
         .route("/", get(serve_dashboard))
+        .route("/dashboard", get(serve_dashboard))
         .route("/v1/status", get(get_status))
         .route("/v1/account/:address", get(get_account))
         .route("/v1/tx", post(submit_tx))
@@ -637,6 +638,16 @@ struct SignAndSubmitRequest {
     deadline: Option<u64>,
     #[serde(default)]
     chain_id: Option<String>,
+    // Agent registration fields
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    endpoint: Option<String>,
+    #[serde(default)]
+    capabilities: Option<Vec<String>>,
+    // Escrow release/refund fields
+    #[serde(default)]
+    escrow_id: Option<String>,
 }
 
 async fn sign_and_submit(
@@ -733,6 +744,72 @@ async fn sign_and_submit(
                 amount,
                 hash_lock,
                 deadline,
+            }
+        }
+        "EscrowRelease" => {
+            let eid_str = req.escrow_id.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'escrow_id' field".into(),
+                    }),
+                )
+            })?;
+            let escrow_id = Hash::from_hex(&eid_str).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid escrow_id: {e}"),
+                    }),
+                )
+            })?;
+            let preimage_str = req.preimage.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'preimage' field".into(),
+                    }),
+                )
+            })?;
+            TxPayload::EscrowRelease {
+                escrow_id,
+                preimage: preimage_str.into_bytes(),
+            }
+        }
+        "EscrowRefund" => {
+            let eid_str = req.escrow_id.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'escrow_id' field".into(),
+                    }),
+                )
+            })?;
+            let escrow_id = Hash::from_hex(&eid_str).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid escrow_id: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::EscrowRefund { escrow_id }
+        }
+        "AgentRegister" => {
+            let name = req.name.ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: "missing 'name' field".into(),
+                    }),
+                )
+            })?;
+            let endpoint = req.endpoint.unwrap_or_default();
+            let capabilities = req.capabilities.unwrap_or_default();
+            TxPayload::AgentRegister {
+                name: name.into_bytes(),
+                endpoint: endpoint.into_bytes(),
+                capabilities: capabilities.into_iter().map(|c| c.into_bytes()).collect(),
             }
         }
         _ => {
