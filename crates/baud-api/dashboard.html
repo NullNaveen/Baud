@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Baud Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='512' y2='512' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='160' y1='100' x2='360' y2='420' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23fff'/%3E%3Cstop offset='100%25' stop-color='%23e8deff'/%3E%3C/linearGradient%3E%3ClinearGradient id='s' x1='340' y1='120' x2='400' y2='180' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%2322c55e'/%3E%3Cstop offset='100%25' stop-color='%2316a34a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='96' fill='url(%23g)'/%3E%3Crect x='148' y='108' width='36' height='296' rx='18' fill='url(%23b)'/%3E%3Crect x='130' y='108' width='72' height='32' rx='8' fill='url(%23b)'/%3E%3Crect x='130' y='240' width='72' height='32' rx='8' fill='url(%23b)'/%3E%3Crect x='130' y='372' width='72' height='32' rx='8' fill='url(%23b)'/%3E%3Cpath d='M184 116H260C310 116 348 150 348 192C348 234 310 268 260 268H184' fill='none' stroke='url(%23b)' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M184 248H272C328 248 370 286 370 332C370 378 328 412 272 412H184' fill='none' stroke='url(%23b)' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='380' cy='130' r='22' fill='url(%23s)'/%3E%3Cpath d='M394 114C414 100 430 114 414 134' fill='none' stroke='%2322c55e' stroke-width='5' stroke-linecap='round' opacity='0.7'/%3E%3Cpath d='M406 102C434 82 458 102 434 130' fill='none' stroke='%2322c55e' stroke-width='4' stroke-linecap='round' opacity='0.45'/%3E%3C/svg%3E">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -17,16 +20,24 @@
   --gradient:linear-gradient(135deg,#7c3aed,#06b6d4);
 }
 [data-theme="light"]{
-  --bg:#f0f0f6;--bg2:#e8e8f0;--card:#ffffff;--card-hover:#f5f5fa;
-  --border:#d8d8e4;--text:#1a1a2e;--text2:#555570;--text3:#888898;
-  --shadow:0 4px 24px rgba(0,0,0,.08);
+  --bg:#f4f4f8;--bg2:#eaeaf0;--card:#ffffff;--card-hover:#f8f8fc;
+  --border:#d0d0dc;--text:#111128;--text2:#44445e;--text3:#77778e;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+  --primary:#7c3aed;--primary-light:#6d28d9;
 }
-html{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;color:var(--text);background:var(--bg)}
+[data-theme="light"] .card{box-shadow:var(--shadow)}
+[data-theme="light"] #sidebar{box-shadow:1px 0 8px rgba(0,0,0,.04)}
+[data-theme="light"] .stat-card .stat-value{filter:saturate(1.2)}
+[data-theme="light"] .badge-green{background:rgba(34,197,94,.1);color:#16a34a}
+[data-theme="light"] .badge-gold{background:rgba(245,166,35,.1);color:#b97a10}
+[data-theme="light"] .badge-cyan{background:rgba(6,182,212,.1);color:#0891b2}
+[data-theme="light"] .progress-bar{background:#e0e0ec}
+html{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{display:flex;min-height:100vh;overflow-x:hidden}
 a{color:var(--primary-light);text-decoration:none}
 a:hover{text-decoration:underline}
 input,select,textarea,button{font-family:inherit;font-size:inherit}
-code,.mono{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:.9em}
+code,.mono{font-family:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospace;font-size:.9em}
 
 /* Sidebar */
 #sidebar{
@@ -81,13 +92,13 @@ code,.mono{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:.9em
 .card:hover{border-color:color-mix(in srgb,var(--primary) 40%,transparent)}
 .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:24px}
 .stat-card{text-align:center;padding:24px 16px}
-.stat-card .stat-value{font-size:2em;font-weight:700;margin:8px 0 4px;font-variant-numeric:tabular-nums}
+.stat-card .stat-value{font-size:2em;font-weight:700;margin:8px 0 4px;font-variant-numeric:tabular-nums;transition:color .3s}
 .stat-card .stat-label{color:var(--text2);font-size:.85em;text-transform:uppercase;letter-spacing:.05em}
 .stat-card .stat-sub{color:var(--text3);font-size:.8em;margin-top:4px}
 
 /* Progress bar */
 .progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:8px}
-.progress-bar .fill{height:100%;background:var(--gradient);border-radius:4px;transition:width .5s ease}
+.progress-bar .fill{height:100%;background:var(--gradient);border-radius:4px;transition:width .8s ease}
 
 /* Tables */
 .table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:24px}
@@ -147,7 +158,7 @@ tr:hover td{background:var(--card-hover)}
 /* JSON viewer */
 .json-view{
   background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
-  padding:16px;overflow-x:auto;white-space:pre-wrap;font-family:'SF Mono',Consolas,monospace;
+  padding:16px;overflow-x:auto;white-space:pre-wrap;font-family:'JetBrains Mono','SF Mono',Consolas,monospace;
   font-size:.82em;line-height:1.6;max-height:400px;overflow-y:auto;
 }
 
@@ -363,12 +374,19 @@ async function refreshData() {
     txt.textContent = 'Disconnected';
   }
 
-  renderPage();
+  // Only do full innerHTML render on first load or page change
+  // Otherwise do targeted DOM updates to avoid flashing
+  if (S._renderedPage !== S.page) {
+    renderPage();
+  } else {
+    updateLiveData();
+  }
 }
 
 // ─── Router ─────────────────────────────────────────────────────────────────
 function navigate(page) {
   S.page = page;
+  S._renderedPage = null; // Force full re-render on navigation
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
   renderPage();
 }
@@ -397,6 +415,7 @@ function updateThemeUI() {
 // ─── Page Renderers ─────────────────────────────────────────────────────────
 function renderPage() {
   const c = $('#content');
+  S._renderedPage = S.page;
   switch(S.page) {
     case 'dashboard': c.innerHTML = renderDashboard(); break;
     case 'mining': c.innerHTML = renderMining(); break;
@@ -410,6 +429,102 @@ function renderPage() {
     case 'help': c.innerHTML = renderHelp(); break;
     default: c.innerHTML = renderDashboard();
   }
+}
+
+// ─── Live Data Updates (no DOM rebuild) ─────────────────────────────────────
+function _set(id, text) {
+  const el = document.getElementById(id);
+  if (el && el.textContent !== String(text)) el.textContent = text;
+}
+function _setHTML(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+function _setWidth(id, pct) {
+  const el = document.getElementById(id);
+  if (el) el.style.width = pct + '%';
+}
+
+function updateLiveData() {
+  switch(S.page) {
+    case 'dashboard': updateDashboard(); break;
+    case 'mining': updateMining(); break;
+    case 'mempool': renderPage(); break;  // mempool rows change, full re-render is fine (small page)
+    case 'node': updateNode(); break;
+    // wallet, send, help, agents, explorer are static forms — no update needed
+  }
+}
+
+function updateDashboard() {
+  const s = S.status;
+  const m = S.mining;
+  const acct = S.myAccount;
+  if (!s) return;
+
+  const rewardBaud = m ? fmt(m.current_block_reward_baud) : '—';
+  const pctMined = m ? parseFloat(m.percent_mined) : 0;
+  const myBalanceBaud = acct ? fmtBaud(acct.balance) : '—';
+  const myBalanceNum = acct ? Number(BigInt(acct.balance) / QUANTA_PER_BAUD) : 0;
+  const myPctOfSupply = myBalanceNum > 0 ? ((myBalanceNum / TOTAL_SUPPLY) * 100) : 0;
+  const myPctStr = myPctOfSupply >= 0.01 ? myPctOfSupply.toFixed(2) : myPctOfSupply.toFixed(4);
+
+  _set('d-balance', myBalanceBaud);
+  _set('d-reward', rewardBaud);
+  _set('d-reward-unit', 'BAUD/block');
+  _set('d-reward-min', `≈ ${m ? fmt(m.current_block_reward_baud * 60) : '—'} BAUD/minute`);
+  _setHTML('d-ownership', myPctOfSupply > 0 ? `You own <strong style="color:var(--primary-light)">${myPctStr}%</strong> of the total 1 billion BAUD supply` : 'Mining in progress…');
+  _setWidth('d-balance-bar', Math.min(myPctOfSupply, 100));
+  _set('d-balance-pct-label', `${myPctStr}% of 1,000,000,000 BAUD`);
+
+  _set('d-blocks', fmt(s.height));
+  _set('d-uptime', fmtUptime(s.uptime_ms));
+  _set('d-net-mined', m ? fmt(m.total_mined_baud) : '—');
+  _set('d-pct-mined', pctMined.toFixed(4) + '% of total supply');
+  _set('d-accounts', fmt(s.accounts));
+  _set('d-escrows', fmt(s.escrows) + ' active escrows');
+  _set('d-mempool', fmt(s.mempool_size));
+
+  if (m) {
+    _set('d-era', `Era ${m.current_era} of 21`);
+    _set('d-halving', `${fmt(m.blocks_until_halving)} blocks until reward halves`);
+    _setWidth('d-era-bar', (1 - m.blocks_until_halving/m.halving_interval)*100);
+    _set('d-era-interval', fmt(m.halving_interval));
+    _set('d-next-halving', '#' + fmt(m.next_halving_block));
+    _set('d-max-supply', fmt(m.total_supply_baud) + ' BAUD');
+    _set('d-mined-sofar', fmt(m.total_mined_baud) + ' BAUD');
+  }
+}
+
+function updateMining() {
+  const m = S.mining;
+  if (!m) return;
+  const pct = parseFloat(m.percent_mined);
+  const eraProgress = ((1 - m.blocks_until_halving/m.halving_interval)*100).toFixed(2);
+
+  _set('m-era', m.current_era);
+  _set('m-reward', fmt(m.current_block_reward_baud));
+  _set('m-halving', fmt(m.blocks_until_halving));
+  _set('m-halving-sub', 'Next: Block #' + fmt(m.next_halving_block));
+  _set('m-supply-pct', pct.toFixed(4) + '%');
+  _set('m-supply-sub', fmt(m.total_mined_baud) + ' / ' + fmt(m.total_supply_baud) + ' BAUD');
+  _set('m-era-label', 'Era ' + m.current_era);
+  _set('m-era-pct', eraProgress + '%');
+  _setWidth('m-era-bar', eraProgress);
+  _set('m-total-label', fmt(m.total_mined_baud) + ' BAUD mined');
+  _set('m-total-pct', pct.toFixed(4) + '%');
+  _setWidth('m-total-bar', Math.min(pct, 100));
+}
+
+function updateNode() {
+  const s = S.status;
+  const h = S.health;
+  if (!s) return;
+  _setHTML('n-status', h ? h.status : 'unknown');
+  _set('n-height', fmt(s.height));
+  _set('n-uptime', fmtUptime(s.uptime_ms));
+  _set('n-accounts', fmt(s.accounts));
+  _set('n-escrows', fmt(s.escrows));
+  _set('n-mempool', fmt(s.mempool_size));
 }
 
 // ── Dashboard ──
@@ -436,45 +551,45 @@ function renderDashboard() {
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
         <div>
           <div style="font-size:.8em;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:4px">Your Balance</div>
-          <div style="font-size:2.4em;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${myBalanceBaud} <span style="font-size:.45em;color:var(--text2)">BAUD</span></div>
-          <div style="font-size:.85em;color:var(--text2);margin-top:2px">
+          <div style="font-size:2.4em;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums"><span id="d-balance">${myBalanceBaud}</span> <span style="font-size:.45em;color:var(--text2)">BAUD</span></div>
+          <div id="d-ownership" style="font-size:.85em;color:var(--text2);margin-top:2px">
             ${myPctOfSupply > 0 ? `You own <strong style="color:var(--primary-light)">${myPctStr}%</strong> of the total 1 billion BAUD supply` : 'Mining in progress…'}
           </div>
         </div>
         <div style="text-align:right">
           <div style="font-size:.8em;color:var(--text3);margin-bottom:4px">Earning</div>
-          <div style="font-size:1.4em;font-weight:600;color:var(--gold)">${rewardBaud} <span style="font-size:.6em;color:var(--text2)">BAUD/block</span></div>
-          <div style="font-size:.8em;color:var(--text3);margin-top:2px">≈ ${m ? fmt(m.current_block_reward_baud * 60) : '—'} BAUD/minute</div>
+          <div style="font-size:1.4em;font-weight:600;color:var(--gold)"><span id="d-reward">${rewardBaud}</span> <span id="d-reward-unit" style="font-size:.6em;color:var(--text2)">BAUD/block</span></div>
+          <div id="d-reward-min" style="font-size:.8em;color:var(--text3);margin-top:2px">≈ ${m ? fmt(m.current_block_reward_baud * 60) : '—'} BAUD/minute</div>
         </div>
       </div>
       ${myPctOfSupply > 0 ? `
       <div class="progress-bar" style="margin-top:16px;height:10px">
-        <div class="fill" style="width:${Math.min(myPctOfSupply, 100)}%"></div>
+        <div class="fill" id="d-balance-bar" style="width:${Math.min(myPctOfSupply, 100)}%"></div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:.75em;color:var(--text3);margin-top:4px">
-        <span>0%</span><span>${myPctStr}% of 1,000,000,000 BAUD</span><span>100%</span>
+        <span>0%</span><span id="d-balance-pct-label">${myPctStr}% of 1,000,000,000 BAUD</span><span>100%</span>
       </div>` : ''}
     </div>
 
     <div class="cards-grid">
       <div class="card stat-card">
         <div class="stat-label">Blocks Produced</div>
-        <div class="stat-value" style="color:var(--primary)">${fmt(s.height)}</div>
-        <div class="stat-sub">${fmtUptime(s.uptime_ms)} uptime</div>
+        <div class="stat-value" style="color:var(--primary)" id="d-blocks">${fmt(s.height)}</div>
+        <div class="stat-sub" id="d-uptime">${fmtUptime(s.uptime_ms)}</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Network Mined</div>
-        <div class="stat-value" style="color:var(--green)">${m ? fmt(m.total_mined_baud) : '—'}</div>
-        <div class="stat-sub">${pctMined.toFixed(4)}% of total supply</div>
+        <div class="stat-value" style="color:var(--green)" id="d-net-mined">${m ? fmt(m.total_mined_baud) : '—'}</div>
+        <div class="stat-sub" id="d-pct-mined">${pctMined.toFixed(4)}% of total supply</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Accounts</div>
-        <div class="stat-value" style="color:var(--cyan)">${fmt(s.accounts)}</div>
-        <div class="stat-sub">${fmt(s.escrows)} active escrows</div>
+        <div class="stat-value" style="color:var(--cyan)" id="d-accounts">${fmt(s.accounts)}</div>
+        <div class="stat-sub" id="d-escrows">${fmt(s.escrows)} active escrows</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Mempool</div>
-        <div class="stat-value" style="color:var(--orange)">${fmt(s.mempool_size)}</div>
+        <div class="stat-value" style="color:var(--orange)" id="d-mempool">${fmt(s.mempool_size)}</div>
         <div class="stat-sub">pending transactions</div>
       </div>
     </div>
@@ -482,15 +597,15 @@ function renderDashboard() {
       <div class="card">
         <div class="section-title"><span class="status-dot green mining-active"></span> Mining Progress</div>
         <div style="display:flex;justify-content:space-between;font-size:.9em;margin-bottom:4px">
-          <span>Era ${m ? m.current_era : 0} of 21</span>
-          <span>${m ? fmt(m.blocks_until_halving) : '—'} blocks until reward halves</span>
+          <span id="d-era">Era ${m ? m.current_era : 0} of 21</span>
+          <span id="d-halving">${m ? fmt(m.blocks_until_halving) : '—'} blocks until reward halves</span>
         </div>
-        <div class="progress-bar"><div class="fill" style="width:${m ? ((1 - m.blocks_until_halving/m.halving_interval)*100) : 0}%"></div></div>
+        <div class="progress-bar"><div class="fill" id="d-era-bar" style="width:${m ? ((1 - m.blocks_until_halving/m.halving_interval)*100) : 0}%"></div></div>
         <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.85em">
-          <div><span style="color:var(--text3)">Blocks Per Era</span><br><strong>${m ? fmt(m.halving_interval) : '—'}</strong></div>
-          <div><span style="color:var(--text3)">Next Halving</span><br>Block <strong>#${m ? fmt(m.next_halving_block) : '—'}</strong></div>
-          <div><span style="color:var(--text3)">Max Supply</span><br><strong>${m ? fmt(m.total_supply_baud) : '—'}</strong> BAUD</div>
-          <div><span style="color:var(--text3)">Mined So Far</span><br><strong>${m ? fmt(m.total_mined_baud) : '—'}</strong> BAUD</div>
+          <div><span style="color:var(--text3)">Blocks Per Era</span><br><strong id="d-era-interval">${m ? fmt(m.halving_interval) : '—'}</strong></div>
+          <div><span style="color:var(--text3)">Next Halving</span><br>Block <strong id="d-next-halving">#${m ? fmt(m.next_halving_block) : '—'}</strong></div>
+          <div><span style="color:var(--text3)">Max Supply</span><br><strong id="d-max-supply">${m ? fmt(m.total_supply_baud) : '—'} BAUD</strong></div>
+          <div><span style="color:var(--text3)">Mined So Far</span><br><strong id="d-mined-sofar">${m ? fmt(m.total_mined_baud) : '—'} BAUD</strong></div>
         </div>
       </div>
       <div class="card">
@@ -533,38 +648,38 @@ function renderMining() {
     <div class="cards-grid">
       <div class="card stat-card">
         <div class="stat-label">Current Era</div>
-        <div class="stat-value" style="color:var(--primary)">${m.current_era}</div>
+        <div class="stat-value" style="color:var(--primary)" id="m-era">${m.current_era}</div>
         <div class="stat-sub">of 21 total eras</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Block Reward</div>
-        <div class="stat-value" style="color:var(--gold)">${fmt(m.current_block_reward_baud)}</div>
+        <div class="stat-value" style="color:var(--gold)" id="m-reward">${fmt(m.current_block_reward_baud)}</div>
         <div class="stat-sub">BAUD per block</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Blocks Until Halving</div>
-        <div class="stat-value" style="color:var(--cyan)">${fmt(m.blocks_until_halving)}</div>
-        <div class="stat-sub">Next: Block #${fmt(m.next_halving_block)}</div>
+        <div class="stat-value" style="color:var(--cyan)" id="m-halving">${fmt(m.blocks_until_halving)}</div>
+        <div class="stat-sub" id="m-halving-sub">Next: Block #${fmt(m.next_halving_block)}</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Supply Mined</div>
-        <div class="stat-value" style="color:var(--green)">${pct.toFixed(4)}%</div>
-        <div class="stat-sub">${fmt(m.total_mined_baud)} / ${fmt(m.total_supply_baud)} BAUD</div>
+        <div class="stat-value" style="color:var(--green)" id="m-supply-pct">${pct.toFixed(4)}%</div>
+        <div class="stat-sub" id="m-supply-sub">${fmt(m.total_mined_baud)} / ${fmt(m.total_supply_baud)} BAUD</div>
       </div>
     </div>
     <div class="card" style="margin-bottom:20px">
       <div class="section-title"><span class="status-dot green mining-active"></span> Era Progress</div>
       <div style="display:flex;justify-content:space-between;font-size:.9em;margin-bottom:4px">
-        <span>Era ${m.current_era}</span><span>${eraProgress}%</span>
+        <span id="m-era-label">Era ${m.current_era}</span><span id="m-era-pct">${eraProgress}%</span>
       </div>
-      <div class="progress-bar"><div class="fill" style="width:${eraProgress}%"></div></div>
+      <div class="progress-bar"><div class="fill" id="m-era-bar" style="width:${eraProgress}%"></div></div>
     </div>
     <div class="card" style="margin-bottom:20px">
       <div class="section-title">Total Supply Progress</div>
       <div style="display:flex;justify-content:space-between;font-size:.9em;margin-bottom:4px">
-        <span>${fmt(m.total_mined_baud)} BAUD mined</span><span>${pct.toFixed(4)}%</span>
+        <span id="m-total-label">${fmt(m.total_mined_baud)} BAUD mined</span><span id="m-total-pct">${pct.toFixed(4)}%</span>
       </div>
-      <div class="progress-bar"><div class="fill" style="width:${Math.min(pct,100)}%"></div></div>
+      <div class="progress-bar"><div class="fill" id="m-total-bar" style="width:${Math.min(pct,100)}%"></div></div>
     </div>
     <div class="card">
       <div class="section-title">Halving Schedule</div>
@@ -776,19 +891,19 @@ function renderNode() {
     <div class="cards-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
       <div class="card stat-card">
         <div class="stat-label">Status</div>
-        <div class="stat-value"><span class="badge badge-green">${h ? h.status : 'unknown'}</span></div>
+        <div class="stat-value"><span class="badge badge-green" id="n-status">${h ? h.status : 'unknown'}</span></div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Height</div>
-        <div class="stat-value" style="color:var(--primary)">${fmt(s.height)}</div>
+        <div class="stat-value" style="color:var(--primary)" id="n-height">${fmt(s.height)}</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Uptime</div>
-        <div class="stat-value" style="color:var(--cyan)">${fmtUptime(s.uptime_ms)}</div>
+        <div class="stat-value" style="color:var(--cyan)" id="n-uptime">${fmtUptime(s.uptime_ms)}</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label">Accounts</div>
-        <div class="stat-value">${fmt(s.accounts)}</div>
+        <div class="stat-value" id="n-accounts">${fmt(s.accounts)}</div>
       </div>
     </div>
     <div class="two-col">
@@ -799,8 +914,8 @@ function renderNode() {
           <tr><td style="color:var(--text3)">Node Address</td><td class="mono copyable" onclick="copyText('${s.node_address}')">${s.node_address}</td></tr>
           <tr><td style="color:var(--text3)">State Root</td><td class="mono copyable" onclick="copyText('${s.state_root}')">${shortAddr(s.state_root)}</td></tr>
           <tr><td style="color:var(--text3)">Last Block Hash</td><td class="mono copyable" onclick="copyText('${s.last_block_hash}')">${shortAddr(s.last_block_hash)}</td></tr>
-          <tr><td style="color:var(--text3)">Escrows</td><td>${fmt(s.escrows)}</td></tr>
-          <tr><td style="color:var(--text3)">Mempool Size</td><td>${fmt(s.mempool_size)}</td></tr>
+          <tr><td style="color:var(--text3)">Escrows</td><td id="n-escrows">${fmt(s.escrows)}</td></tr>
+          <tr><td style="color:var(--text3)">Mempool Size</td><td id="n-mempool">${fmt(s.mempool_size)}</td></tr>
         </tbody></table>
       </div>
       <div class="card">
@@ -1209,36 +1324,9 @@ async function submitAgentRegister() {
 
 // ── Help ──
 function renderHelp() {
-  const terms = [
-    { term: 'Blockchain', simple: 'A shared digital notebook that records every transaction. Every computer on the network has a copy, so nobody can cheat.', more: 'Think of it like a Google Doc that everyone can read but nobody can secretly edit. Each "page" (block) is linked to the previous one with math, creating an unbreakable chain.' },
-    { term: 'Block', simple: 'A batch of transactions grouped together. A new block is created roughly every second in Baud.', more: 'Like a page in the notebook. Each page is numbered (block height) and sealed so it can\'t be changed afterward.' },
-    { term: 'Mining', simple: 'The process of creating new blocks and earning BAUD as a reward. Your node automatically mines when it\'s running.', more: 'Unlike Bitcoin, Baud mining doesn\'t waste electricity. Your computer just takes turns with other validators to create blocks. The reward is currently 500 BAUD per block and halves every 1 million blocks.' },
-    { term: 'Node', simple: 'A computer running the Baud software. Your node keeps a copy of all transactions and participates in creating blocks.', more: 'When you run baud-node (or click "Baud Node" in the Start Menu), your computer becomes a node on the network.' },
-    { term: 'Secret Key', simple: 'A 64-character password that controls your BAUD. Anyone who has it can spend your money. NEVER share it.', more: 'Generated using Ed25519 cryptography. Your secret key mathematically derives your address (public key). There is no "forgot password" — lose it and your funds are gone forever.' },
-    { term: 'Address', simple: 'Your "account number" — a 64-character identifier where people send BAUD to you. Safe to share publicly.', more: 'Derived from your secret key using one-way math. You can\'t reverse-engineer the secret key from the address.' },
-    { term: 'Nonce', simple: 'A transaction counter that prevents replay attacks. It starts at 0 and increases by 1 with each transaction you make.', more: 'If your nonce is currently 5, your next transaction must use nonce 5. The network rejects transactions with wrong nonces, preventing someone from resending your old transactions.' },
-    { term: 'Transaction', simple: 'An instruction like "send 100 BAUD from me to this address." Must be signed with your secret key.', more: 'Every transaction is broadcast to the network, included in a block, and permanently recorded on the blockchain.' },
-    { term: 'Escrow', simple: 'A "safe deposit box" for a deal. BAUD is locked up and only released when certain conditions are met.', more: 'Example: You pay an AI agent to do work. The BAUD is locked in escrow. If the agent delivers (proves it with a secret code), the BAUD is released to them. If the deadline passes without delivery, you get a refund. Neither party needs to trust the other.' },
-    { term: 'Hash Lock / HTLC', simple: 'A math puzzle that locks an escrow. The recipient must reveal a secret word (preimage) whose hash matches the lock to claim the funds.', more: 'HTLC stands for Hash Time-Locked Contract. It combines a hash-based puzzle (the lock) with a time deadline (the refund window). Used for trustless payments between strangers.' },
-    { term: 'Preimage', simple: 'The secret word/code used to unlock an escrow. Only the recipient knows it.', more: 'The sender creates a hash of the preimage and puts it in the escrow. The recipient reveals the preimage to claim the funds. This is how escrows remain trustless.' },
-    { term: 'Quanta', simple: 'The smallest unit of BAUD. 1 BAUD = 10^18 quanta (like cents to dollars, but much smaller).', more: 'All internal calculations use quanta for precision. When you see huge numbers in the API (like 500000000000000000000), divide by 10^18 to get the BAUD amount.' },
-    { term: 'Ed25519', simple: 'The type of encryption/signing Baud uses. It\'s fast, secure, and used by Signal, SSH, and Tor.', more: 'A digital signature algorithm using elliptic curve cryptography (Curve25519). Creates 32-byte keys that would take billions of years to crack.' },
-    { term: 'AES-256-GCM', simple: 'Encryption used to protect your wallet file. Like a super-strong padlock on your key storage.', more: 'AES-256 is the encryption standard used by governments and banks. GCM mode adds authentication — it not only encrypts your data but also detects if anyone tampered with it. Used with Argon2id key derivation to turn your password into the encryption key.' },
-    { term: 'Validator', simple: 'A node that participates in creating blocks. If your node is running and has a secret key, it\'s a validator.', more: 'Validators take turns proposing new blocks. Baud uses round-robin leader selection — each validator gets a turn in order.' },
-    { term: 'Mempool', simple: 'A waiting room for transactions. When you submit a transaction, it goes here until the next block includes it.', more: 'Usually transactions only stay in the mempool for 1-2 seconds before being included in the next block.' },
-    { term: 'State Root', simple: 'A mathematical fingerprint of the entire blockchain state (all balances, escrows, etc).', more: 'A single hash that summarizes every account balance, escrow, and piece of data on the chain. If even one number changes, the state root changes completely. Used to verify data integrity.' },
-    { term: 'Consensus', simple: 'The process by which all nodes agree on the current state of the blockchain.', more: 'Baud uses BFT (Byzantine Fault Tolerant) consensus — the network works correctly even if up to ⅓ of validators are dishonest or offline.' },
-    { term: 'Halving', simple: 'The mining reward cuts in half at regular intervals, making BAUD scarcer over time. Happens every 1 million blocks.', more: 'Era 0: 500 BAUD/block → Era 1: 250 → Era 2: 125 → ... After 21 halvings, no more BAUD will be created. This is similar to Bitcoin\'s supply schedule.' },
-    { term: 'Agent Registration', simple: 'Registering your AI agent\'s name, URL, and skills on the blockchain so other agents can find and pay it.', more: 'Creates a permanent, public record of your agent\'s identity. Other agents can look up your address and see what services you offer.' },
-    { term: 'Chain ID', simple: 'A unique name for the network (like "baud-mainnet"). Prevents transactions meant for one network from working on another.', more: 'Included in every transaction signature. A testnet transaction cannot be replayed on mainnet because the chain IDs are different.' },
-    { term: 'P2P / Peer-to-Peer', simple: 'Computers talking directly to each other without a central server. How Baud nodes share blocks and transactions.', more: 'Baud uses WebSocket connections between nodes. Each node gossips new blocks and transactions to its peers.' },
-    { term: 'Rate Limiting', simple: 'Protection against spam. The API allows 60 requests in a burst and 20 per second sustained.', more: 'Uses a token-bucket algorithm. Prevents anyone from overwhelming the node with excessive requests.' },
-    { term: 'CI (Continuous Integration)', simple: 'Automatic testing that runs every time code is pushed to GitHub. Makes sure changes don\'t break anything.', more: 'Our CI runs `cargo test` and `cargo clippy` on every push. If tests fail, the badge turns red. It catches bugs before they reach users.' },
-    { term: 'GitHub Deployments', simple: 'Automatic publishing of the Baud website to GitHub Pages every time we push changes.', more: 'The website at https://nullnaveen.github.io/Baud/ is automatically updated when code is pushed. No manual upload needed.' },
-  ];
-
   return `<div class="page">
-    <div class="page-header"><h1>Help & Glossary</h1><p>Everything explained in plain English. Click any term to expand.</p></div>
+    <div class="page-header"><h1>Help & Guide</h1><p>Everything you need to know about using Baud</p></div>
+
     <div class="card" style="margin-bottom:20px">
       <div class="section-title">Quick Start Guide</div>
       <div style="line-height:1.8;font-size:.95em">
@@ -1249,56 +1337,92 @@ function renderHelp() {
         <p><strong>5. Explore</strong> — Use <a href="#explorer" onclick="navigate('explorer')" style="color:var(--primary)">Explorer</a> to look up transactions and escrows.</p>
       </div>
     </div>
-    <div class="card">
-      <div class="section-title">Glossary — Technical Terms Explained</div>
-      <p style="color:var(--text3);font-size:.85em;margin-bottom:16px">Click any term to see a simple explanation. Click again for more detail.</p>
-      <div id="glossary-list">
-        ${terms.map((t, i) => `
-          <div class="glossary-item" style="border-bottom:1px solid var(--bg3);padding:12px 0;cursor:pointer" onclick="toggleGlossary(this)">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <strong style="color:var(--primary);font-size:1.05em">${t.term}</strong>
-              <svg class="glossary-arrow" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" width="16" height="16" style="transition:transform .2s"><path d="M6 9l6 6 6-6"/></svg>
-            </div>
-            <div class="glossary-simple" style="display:none;margin-top:8px;color:var(--text2);font-size:.93em;line-height:1.6">${t.simple}</div>
-            <div class="glossary-more" style="display:none;margin-top:8px;padding:10px;background:var(--bg1);border-radius:8px;color:var(--text3);font-size:.88em;line-height:1.6">${t.more}</div>
-          </div>
-        `).join('')}
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">Dashboard Pages Explained</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:.93em">
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--primary)">
+          <strong style="color:var(--primary)">Dashboard</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Your home screen. Shows your BAUD balance, mining rewards, block production stats, and a quick overview of the entire network at a glance.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--gold)">
+          <strong style="color:var(--gold)">Mining</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Detailed mining statistics. See the current era, block reward, halving countdown, and the full halving schedule across all 21 eras.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--cyan)">
+          <strong style="color:var(--cyan)">Wallet</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Generate new keypairs or derive an address from an existing secret key. Each keypair is a separate identity on the network.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--green)">
+          <strong style="color:var(--green)">Send</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Transfer BAUD to any address, or create a trustless escrow for conditional payments. Sign transactions with your secret key.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--cyan)">
+          <strong style="color:var(--cyan)">Accounts</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Look up any address on the network to check its balance, nonce, and agent registration metadata.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--orange)">
+          <strong style="color:var(--orange)">Mempool</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">View pending transactions waiting to be included in the next block. Transactions typically clear within 1-2 seconds.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--primary)">
+          <strong style="color:var(--primary)">Node Info</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">View your node's status, chain ID, state root, uptime, and a complete list of available API endpoints.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--green)">
+          <strong style="color:var(--green)">Explorer</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Search for specific transactions by hash, look up escrows by ID, and release or refund escrows directly.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--gold)">
+          <strong style="color:var(--gold)">Agents</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Register your AI agent on the network with a name, endpoint URL, and capabilities. Makes your agent discoverable for M2M payments.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--red)">
+          <strong style="color:var(--red)">Help</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">You are here! Quick start guide, page explanations, and answers to common questions about Baud.</p>
+        </div>
       </div>
     </div>
-    <div class="card" style="margin-top:20px">
+
+    <div class="card">
       <div class="section-title">Frequently Asked Questions</div>
       <div style="line-height:1.8;font-size:.93em">
-        <p><strong>Q: Can I have multiple secret keys?</strong><br>
-        A: Yes, each key creates a completely separate identity with its own address and balance. Think of each key as a different bank account. Your main key (the validator key) is the one earning mining rewards.</p>
-        <p style="margin-top:12px"><strong>Q: What happens if I lose my secret key?</strong><br>
-        A: All BAUD at that address is lost forever. There is no recovery mechanism. Always back up your key.</p>
-        <p style="margin-top:12px"><strong>Q: Are there transaction fees?</strong><br>
-        A: No. Baud transactions are completely free. Rate limiting prevents spam instead of fees.</p>
-        <p style="margin-top:12px"><strong>Q: How long until my BAUD is confirmed?</strong><br>
-        A: About 1-2 seconds. Transactions enter the mempool and are included in the very next block.</p>
-        <p style="margin-top:12px"><strong>Q: What is escrow used for?</strong><br>
-        A: Escrow lets two parties make a trustless deal. BAUD is locked and only released when conditions are met (like the recipient proving they completed a task). If the deadline passes without completion, the sender gets a refund.</p>
-        <p style="margin-top:12px"><strong>Q: How do I stop mining?</strong><br>
-        A: Close the node. Mining happens automatically while the node is running. You can stop via the "Stop Baud Node" shortcut in the Start Menu, or end the baud-node process in Task Manager.</p>
+
+        <p><strong style="color:var(--primary)">Q: What is Baud and why does it exist?</strong><br>
+        A: Baud is a cryptocurrency designed from the ground up for <strong>machine-to-machine (M2M) payments</strong>. As AI agents become more autonomous, they need a way to pay each other for services — inference, data, compute, storage. Baud provides instant, feeless transactions with built-in escrow, so AI agents can transact trustlessly without human intervention.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: How is Baud different from Bitcoin or Ethereum?</strong><br>
+        A: <strong>Speed:</strong> Baud produces blocks every ~1 second vs Bitcoin's 10 minutes. <strong>Fees:</strong> Baud transactions are completely free — no gas fees. <strong>Purpose:</strong> While Bitcoin is "digital gold" and Ethereum is a general smart contract platform, Baud is purpose-built for AI agent economies. <strong>Escrow:</strong> Built-in hash-time-locked escrow for trustless M2M deals, not requiring complex smart contracts.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: Is Baud secure? Can someone steal my funds?</strong><br>
+        A: Baud uses <strong>Ed25519</strong> cryptography (the same used by Signal, SSH, and Tor) for signing transactions, and <strong>AES-256-GCM</strong> with Argon2id for wallet encryption. Your funds are safe as long as you keep your secret key private. No one can move your BAUD without your 64-character secret key — there is no backdoor, no admin override, and no "forgot password" recovery.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: Why are there no transaction fees?</strong><br>
+        A: Baud uses rate limiting instead of fees to prevent spam. Each node allows 60 requests in a burst and 20 per second sustained. This keeps the network healthy without taxing every transaction — critical for M2M micro-payments where fees would make small transactions economically impossible.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: What is the total supply? Will more BAUD be printed?</strong><br>
+        A: The maximum supply is exactly <strong>1,000,000,000 BAUD</strong> (1 billion). Mining starts at 500 BAUD per block and halves every 1,000,000 blocks across 21 eras — similar to Bitcoin's scarcity model. Once all 21 eras complete, no new BAUD will ever be created. The supply schedule is hardcoded and cannot be changed.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: What are escrows and when would I use them?</strong><br>
+        A: Escrows are built-in "trust-free deals." You lock BAUD with a hash lock and a deadline. The recipient must reveal a secret preimage to claim the funds. If the deadline passes without the reveal, the sender gets an automatic refund. <strong>Use case:</strong> An AI agent pays another agent for a task — the payment is locked in escrow until the work is proven complete.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: Can I have multiple secret keys / wallets?</strong><br>
+        A: Yes. Each secret key creates a completely separate address with its own balance. Think of it as having multiple bank accounts. Your main key (the validator key) earns mining rewards, but you can generate as many additional keys as you want from the Wallet page.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: What happens if I lose my secret key?</strong><br>
+        A: <strong>All BAUD at that address is permanently lost.</strong> There is no recovery mechanism, no customer support, and no way to reset it. This is by design — it means nobody else can access your funds either. Always back up your key securely.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: How does mining work? Does it waste energy?</strong><br>
+        A: Unlike Bitcoin's proof-of-work, Baud uses <strong>BFT (Byzantine Fault Tolerant) consensus</strong> with round-robin leader selection. Validators take turns proposing blocks — no energy-wasting puzzle solving. If your node is running, it's mining. The reward is 500 BAUD per block (in Era 0) and blocks are produced every ~1 second.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: Can I use Baud for real-world payments?</strong><br>
+        A: Baud is primarily designed for M2M (machine-to-machine) transactions between AI agents, but it works for any peer-to-peer transfer. The zero-fee, instant-confirmation model makes it suitable for micro-payments, tipping, and any scenario where speed and cost matter more than integration with traditional finance.</p>
+
+        <p style="margin-top:16px"><strong style="color:var(--primary)">Q: How do I stop mining / shut down my node?</strong><br>
+        A: Close the node process. On Windows, use the "Stop Baud Node" shortcut in the Start Menu, or end the baud-node process in Task Manager. Mining happens automatically while the node is running.</p>
       </div>
     </div>
   </div>`;
-}
-
-function toggleGlossary(el) {
-  const simple = el.querySelector('.glossary-simple');
-  const more = el.querySelector('.glossary-more');
-  const arrow = el.querySelector('.glossary-arrow');
-  if (simple.style.display === 'none') {
-    simple.style.display = 'block';
-    arrow.style.transform = 'rotate(180deg)';
-  } else if (more.style.display === 'none') {
-    more.style.display = 'block';
-  } else {
-    simple.style.display = 'none';
-    more.style.display = 'none';
-    arrow.style.transform = '';
-  }
 }
 
 // ─── Init ───────────────────────────────────────────────────────────────────
