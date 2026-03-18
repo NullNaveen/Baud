@@ -6,7 +6,7 @@
 <title>Baud Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='512' y2='512' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='160' y1='100' x2='360' y2='420' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23fff'/%3E%3Cstop offset='100%25' stop-color='%23e8deff'/%3E%3C/linearGradient%3E%3ClinearGradient id='s' x1='340' y1='120' x2='400' y2='180' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%2322c55e'/%3E%3Cstop offset='100%25' stop-color='%2316a34a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='96' fill='url(%23g)'/%3E%3Crect x='148' y='108' width='36' height='296' rx='18' fill='url(%23b)'/%3E%3Crect x='130' y='108' width='72' height='32' rx='8' fill='url(%23b)'/%3E%3Crect x='130' y='240' width='72' height='32' rx='8' fill='url(%23b)'/%3E%3Crect x='130' y='372' width='72' height='32' rx='8' fill='url(%23b)'/%3E%3Cpath d='M184 116H260C310 116 348 150 348 192C348 234 310 268 260 268H184' fill='none' stroke='url(%23b)' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M184 248H272C328 248 370 286 370 332C370 378 328 412 272 412H184' fill='none' stroke='url(%23b)' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='380' cy='130' r='22' fill='url(%23s)'/%3E%3Cpath d='M394 114C414 100 430 114 414 134' fill='none' stroke='%2322c55e' stroke-width='5' stroke-linecap='round' opacity='0.7'/%3E%3Cpath d='M406 102C434 82 458 102 434 130' fill='none' stroke='%2322c55e' stroke-width='4' stroke-linecap='round' opacity='0.45'/%3E%3C/svg%3E">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -32,12 +32,12 @@
 [data-theme="light"] .badge-gold{background:rgba(245,166,35,.1);color:#b97a10}
 [data-theme="light"] .badge-cyan{background:rgba(6,182,212,.1);color:#0891b2}
 [data-theme="light"] .progress-bar{background:#e0e0ec}
-html{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+html{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{display:flex;min-height:100vh;overflow-x:hidden}
 a{color:var(--primary-light);text-decoration:none}
 a:hover{text-decoration:underline}
 input,select,textarea,button{font-family:inherit;font-size:inherit}
-code,.mono{font-family:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospace;font-size:.9em}
+code,.mono{font-family:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospace;font-size:.85em}
 
 /* Sidebar */
 #sidebar{
@@ -73,9 +73,9 @@ code,.mono{font-family:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospa
 .theme-toggle svg{width:16px;height:16px}
 
 /* Main */
-#main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;padding:24px 32px 48px}
+#main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;padding:24px 36px 48px}
 .page-header{margin-bottom:24px}
-.page-header h1{font-size:1.6em;font-weight:700}
+.page-header h1{font-size:1.5em;font-weight:700}
 .page-header p{color:var(--text2);margin-top:4px}
 
 /* Status dot */
@@ -92,9 +92,11 @@ code,.mono{font-family:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospa
 .card:hover{border-color:color-mix(in srgb,var(--primary) 40%,transparent)}
 .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:24px}
 .stat-card{text-align:center;padding:24px 16px}
-.stat-card .stat-value{font-size:2em;font-weight:700;margin:8px 0 4px;font-variant-numeric:tabular-nums;transition:color .3s}
-.stat-card .stat-label{color:var(--text2);font-size:.85em;text-transform:uppercase;letter-spacing:.05em}
-.stat-card .stat-sub{color:var(--text3);font-size:.8em;margin-top:4px}
+.stat-card .stat-value{font-family:'Space Grotesk','DM Sans',sans-serif;font-size:1.8em;font-weight:700;margin:8px 0 4px;font-variant-numeric:tabular-nums;font-feature-settings:'tnum';transition:color .3s}
+.stat-card .stat-label{color:var(--text2);font-size:.82em;text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+.stat-card .stat-sub{color:var(--text3);font-size:.78em;margin-top:4px}
+h1,.section-title{font-family:'Space Grotesk','DM Sans',sans-serif;letter-spacing:-.01em}
+#content{max-width:1400px}
 
 /* Progress bar */
 .progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:8px}
@@ -415,7 +417,6 @@ function updateThemeUI() {
 // ─── Page Renderers ─────────────────────────────────────────────────────────
 function renderPage() {
   const c = $('#content');
-  S._renderedPage = S.page;
   switch(S.page) {
     case 'dashboard': c.innerHTML = renderDashboard(); break;
     case 'mining': c.innerHTML = renderMining(); break;
@@ -429,6 +430,8 @@ function renderPage() {
     case 'help': c.innerHTML = renderHelp(); break;
     default: c.innerHTML = renderDashboard();
   }
+  // Only cache rendered page if we have real data (not "connecting" placeholders)
+  if (S.connected) S._renderedPage = S.page;
 }
 
 // ─── Live Data Updates (no DOM rebuild) ─────────────────────────────────────
@@ -449,7 +452,7 @@ function updateLiveData() {
   switch(S.page) {
     case 'dashboard': updateDashboard(); break;
     case 'mining': updateMining(); break;
-    case 'mempool': renderPage(); break;  // mempool rows change, full re-render is fine (small page)
+    case 'mempool': updateMempool(); break;
     case 'node': updateNode(); break;
     // wallet, send, help, agents, explorer are static forms — no update needed
   }
@@ -527,6 +530,38 @@ function updateNode() {
   _set('n-mempool', fmt(s.mempool_size));
 }
 
+function updateMempool() {
+  const mp = S.mempool;
+  if (!mp) return;
+  _set('mp-pending', fmt(mp.pending_count));
+  const newSig = mp.transactions.map(t => t.hash).join(',');
+  if (S._mpSig !== newSig) {
+    S._mpSig = newSig;
+    const el = document.getElementById('mp-body');
+    if (el) el.innerHTML = mempoolBody(mp);
+  }
+}
+
+function mempoolBody(mp) {
+  if (mp.transactions.length > 0) {
+    return `<div class="table-wrap"><table>
+      <tr><th>Hash</th><th>Sender</th><th>Nonce</th><th>Timestamp</th></tr>
+      ${mp.transactions.map(tx => `
+        <tr>
+          <td class="mono copyable" onclick="copyText('${tx.hash}')">${shortAddr(tx.hash)}</td>
+          <td class="mono copyable" onclick="copyText('${tx.sender}')">${shortAddr(tx.sender)}</td>
+          <td>${tx.nonce}</td>
+          <td>${new Date(tx.timestamp).toLocaleTimeString()}</td>
+        </tr>
+      `).join('')}
+    </table></div>`;
+  }
+  return `<div class="card" style="text-align:center;padding:48px;color:var(--text3)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin:0 auto 12px;opacity:.4"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
+    <p>Mempool is empty — all transactions have been included in blocks</p>
+  </div>`;
+}
+
 // ── Dashboard ──
 function renderDashboard() {
   const s = S.status;
@@ -551,14 +586,14 @@ function renderDashboard() {
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
         <div>
           <div style="font-size:.8em;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:4px">Your Balance</div>
-          <div style="font-size:2.4em;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums"><span id="d-balance">${myBalanceBaud}</span> <span style="font-size:.45em;color:var(--text2)">BAUD</span></div>
+          <div style="font-family:'Space Grotesk','DM Sans',sans-serif;font-size:2.1em;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums;font-feature-settings:'tnum'"><span id="d-balance">${myBalanceBaud}</span> <span style="font-size:.45em;color:var(--text2)">BAUD</span></div>
           <div id="d-ownership" style="font-size:.85em;color:var(--text2);margin-top:2px">
             ${myPctOfSupply > 0 ? `You own <strong style="color:var(--primary-light)">${myPctStr}%</strong> of the total 1 billion BAUD supply` : 'Mining in progress…'}
           </div>
         </div>
         <div style="text-align:right">
           <div style="font-size:.8em;color:var(--text3);margin-bottom:4px">Earning</div>
-          <div style="font-size:1.4em;font-weight:600;color:var(--gold)"><span id="d-reward">${rewardBaud}</span> <span id="d-reward-unit" style="font-size:.6em;color:var(--text2)">BAUD/block</span></div>
+          <div style="font-family:'Space Grotesk','DM Sans',sans-serif;font-size:1.4em;font-weight:600;color:var(--gold);font-feature-settings:'tnum'"><span id="d-reward">${rewardBaud}</span> <span id="d-reward-unit" style="font-size:.6em;color:var(--text2)">BAUD/block</span></div>
           <div id="d-reward-min" style="font-size:.8em;color:var(--text3);margin-top:2px">≈ ${m ? fmt(m.current_block_reward_baud * 60) : '—'} BAUD/minute</div>
         </div>
       </div>
@@ -851,32 +886,16 @@ function renderAccounts() {
 // ── Mempool ──
 function renderMempool() {
   const mp = S.mempool;
+  S._mpSig = mp ? mp.transactions.map(t => t.hash).join(',') : '';
   return `<div class="page">
     <div class="page-header"><h1>Mempool</h1><p>Pending transactions waiting for inclusion in a block</p></div>
     <div class="cards-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
       <div class="card stat-card">
         <div class="stat-label">Pending</div>
-        <div class="stat-value" style="color:var(--primary)">${mp ? fmt(mp.pending_count) : '—'}</div>
+        <div class="stat-value" style="color:var(--primary)" id="mp-pending">${mp ? fmt(mp.pending_count) : '—'}</div>
       </div>
     </div>
-    ${mp && mp.transactions.length > 0 ? `
-      <div class="table-wrap"><table>
-        <tr><th>Hash</th><th>Sender</th><th>Nonce</th><th>Timestamp</th></tr>
-        ${mp.transactions.map(tx => `
-          <tr>
-            <td class="mono copyable" onclick="copyText('${tx.hash}')">${shortAddr(tx.hash)}</td>
-            <td class="mono copyable" onclick="copyText('${tx.sender}')">${shortAddr(tx.sender)}</td>
-            <td>${tx.nonce}</td>
-            <td>${new Date(tx.timestamp).toLocaleTimeString()}</td>
-          </tr>
-        `).join('')}
-      </table></div>
-    ` : `
-      <div class="card" style="text-align:center;padding:48px;color:var(--text3)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin:0 auto 12px;opacity:.4"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
-        <p>Mempool is empty — all transactions have been included in blocks</p>
-      </div>
-    `}
+    <div id="mp-body">${mp ? mempoolBody(mp) : ''}</div>
   </div>`;
 }
 
