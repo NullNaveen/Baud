@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download — Baud Cryptocurrency</title>
+    <meta name="description" content="Install Baud in one command. Start mining BAUD on Windows, Linux, or WSL.">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050510; --bg-alt: #0a0a1a; --surface: #0f0f20; --surface-hover: #141430;
+            --border: #1a1a35; --border-light: #252545; --text: #e8e8f0; --text-secondary: #a0a0b8;
+            --muted: #707088; --primary: #8b5cf6; --primary-light: #a78bfa; --primary-glow: rgba(139,92,246,0.15);
+            --gold: #f5a623; --gold-light: #ffc857; --green: #22c55e; --cyan: #06b6d4; --pink: #ec4899;
+        }
+        [data-theme="light"] {
+            --bg: #f8f9fc; --bg-alt: #f0f1f5; --surface: #ffffff; --surface-hover: #f5f5fa;
+            --border: #e0e2e8; --border-light: #d0d3dc; --text: #1a1a2e; --text-secondary: #4a4a65;
+            --muted: #6a6a80; --primary: #7c3aed; --primary-light: #6d28d9; --primary-glow: rgba(139,92,246,0.08);
+            --gold: #d4890c; --gold-light: #b8740a; --green: #16a34a; --cyan: #0891b2; --pink: #db2777;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+        a { color: var(--primary-light); text-decoration: none; } a:hover { text-decoration: underline; }
+        code { font-family: 'JetBrains Mono', monospace; }
+
+        /* Nav */
+        nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 16px 0; background: rgba(5,5,16,0.85); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(26,26,53,0.5); }
+        [data-theme="light"] nav { background: rgba(248,249,252,0.88); border-bottom-color: rgba(0,0,0,0.08); }
+        .nav-inner { max-width: 900px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
+        .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
+        .nav-logo svg { width: 32px; height: 32px; } .nav-logo span { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+        .nav-links { display: flex; align-items: center; gap: 24px; list-style: none; }
+        .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; } .nav-links a:hover { color: var(--text); }
+        .nav-cta { padding: 8px 20px; background: var(--primary); color: white !important; border-radius: 8px; font-weight: 600 !important; transition: background 0.2s; }
+        .nav-cta:hover { background: var(--primary-light); }
+        .theme-toggle-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); padding: 7px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; font-family: 'Inter', sans-serif; }
+        .theme-toggle-btn:hover { border-color: var(--border-light); color: var(--text); }
+
+        /* Hero */
+        main { padding: 120px 0 80px; }
+        h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
+        .subtitle { color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 48px; }
+        .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 24px; }
+        .back-link:hover { color: var(--text); text-decoration: none; }
+
+        /* Platform tabs */
+        .platform-tabs { display: flex; gap: 0; margin-bottom: 0; }
+        .platform-tab { padding: 12px 28px; background: var(--surface); border: 1px solid var(--border); border-bottom: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .platform-tab:first-child { border-radius: 12px 0 0 0; }
+        .platform-tab:last-child { border-radius: 0 12px 0 0; }
+        .platform-tab.active { background: var(--surface-hover); color: var(--primary-light); border-color: var(--primary); border-bottom-color: var(--surface-hover); }
+        .platform-tab:not(.active):hover { color: var(--text); }
+
+        .install-box { background: var(--surface); border: 1px solid var(--border); border-radius: 0 12px 12px 12px; padding: 32px; margin-bottom: 48px; }
+        .install-box[data-platform]:not(.active) { display: none; }
+        .install-box.active { display: block; }
+        .install-box h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        .install-box h3 .icon { font-size: 1.2rem; }
+        .install-box p { color: var(--text-secondary); font-size: 0.92rem; margin-bottom: 16px; }
+
+        .cmd-block { position: relative; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+        .cmd-block code { font-size: 0.88rem; color: var(--green); word-break: break-all; }
+        .copy-btn { position: absolute; top: 10px; right: 10px; padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.78rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.2s; }
+        .copy-btn:hover { border-color: var(--primary); color: var(--primary-light); }
+        .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+        .prereqs { color: var(--muted); font-size: 0.82rem; margin-top: 8px; }
+        .prereqs a { color: var(--muted); text-decoration: underline; }
+
+        /* Alternative */
+        .alt-section { margin-bottom: 48px; }
+        .alt-section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 16px; }
+        .release-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-size: 0.95rem; font-weight: 600; color: var(--text); text-decoration: none; transition: all 0.2s; }
+        .release-btn:hover { border-color: var(--primary); text-decoration: none; background: var(--surface-hover); }
+        .release-btn svg { flex-shrink: 0; }
+
+        /* Post-install */
+        .section-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
+        .section-desc { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 24px; }
+
+        .step-grid { display: grid; gap: 16px; margin-bottom: 48px; }
+        .step-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px 28px; display: flex; gap: 20px; align-items: flex-start; transition: border-color 0.2s; }
+        .step-card:hover { border-color: var(--border-light); }
+        .step-num { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; }
+        .step-card:nth-child(1) .step-num { background: rgba(139,92,246,0.15); color: var(--primary-light); }
+        .step-card:nth-child(2) .step-num { background: rgba(6,182,212,0.15); color: var(--cyan); }
+        .step-card:nth-child(3) .step-num { background: rgba(34,197,94,0.15); color: var(--green); }
+        .step-card:nth-child(4) .step-num { background: rgba(245,166,35,0.15); color: var(--gold); }
+        .step-body h4 { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+        .step-body p { color: var(--text-secondary); font-size: 0.9rem; }
+
+        /* Icons explanation */
+        .icon-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 48px; }
+        .icon-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px 24px; text-align: center; transition: border-color 0.2s; }
+        .icon-card:hover { border-color: var(--border-light); }
+        .icon-card .icon-emoji { font-size: 2rem; margin-bottom: 12px; }
+        .icon-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+        .icon-card p { color: var(--text-secondary); font-size: 0.88rem; }
+        .icon-card .badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; margin-top: 10px; }
+        .badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
+        .badge-cyan { background: rgba(6,182,212,0.12); color: var(--cyan); }
+        .badge-pink { background: rgba(236,72,153,0.12); color: var(--pink); }
+
+        [data-theme="light"] .step-card, [data-theme="light"] .icon-card, [data-theme="light"] .install-box { box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+
+        footer { padding: 40px 0; border-top: 1px solid var(--border); }
+        .footer-inner { display: flex; justify-content: space-between; align-items: center; }
+        .footer-left { color: var(--muted); font-size: 0.85rem; }
+        .footer-links { display: flex; gap: 24px; list-style: none; }
+        .footer-links a { color: var(--muted); text-decoration: none; font-size: 0.85rem; } .footer-links a:hover { color: var(--text); }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; } .nav-links { display: none; }
+            .icon-grid { grid-template-columns: 1fr; }
+            .step-card { flex-direction: column; gap: 12px; }
+            .footer-inner { flex-direction: column; gap: 16px; }
+            .platform-tab { padding: 10px 16px; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs><rect width="32" height="32" rx="6" fill="url(#g)"/><rect x="8" y="6.5" width="3" height="19" rx="1.5" fill="white"/><rect x="7" y="6.5" width="5" height="2.5" rx="0.8" fill="white"/><rect x="7" y="14.75" width="5" height="2.5" rx="0.8" fill="white"/><rect x="7" y="23" width="5" height="2.5" rx="0.8" fill="white"/><path d="M11 7.5 H15 C18 7.5 20.5 9.5 20.5 12 C20.5 14.5 18 16.5 15 16.5 H11" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 15 H16 C19.5 15 22.5 17.2 22.5 20 C22.5 22.8 19.5 25 16 25 H11" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="8" r="2.5" fill="#22c55e"/><path d="M25.5 6.5 C27.5 5.3 29 6.5 27.8 8.5" fill="none" stroke="#22c55e" stroke-width="1" stroke-linecap="round" opacity="0.6"/></svg>
+                <span>Baud</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="download.html" style="color:var(--text)">Download</a></li>
+                <li><a href="faq.html">FAQ</a></li>
+                <li><button class="theme-toggle-btn" onclick="toggleTheme()"><span id="theme-icon">☀️</span><span id="theme-label">Light</span></button></li>
+                <li><a href="https://github.com/NullNaveen/Baud" class="nav-cta">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main>
+        <div class="container">
+            <a href="index.html" class="back-link">← Back to Home</a>
+            <h1>Download Baud</h1>
+            <p class="subtitle">One command to install. Start mining BAUD in under 5 minutes.</p>
+
+            <!-- Platform Tabs -->
+            <div class="platform-tabs">
+                <button class="platform-tab active" onclick="showPlatform('windows')">Windows</button>
+                <button class="platform-tab" onclick="showPlatform('linux')">Linux / WSL</button>
+                <button class="platform-tab" onclick="showPlatform('manual')">Manual</button>
+            </div>
+
+            <!-- Windows -->
+            <div class="install-box active" data-platform="windows" id="platform-windows">
+                <h3><span class="icon">⊞</span> Windows (PowerShell)</h3>
+                <p>Open PowerShell and paste this command. It installs Baud, builds from source, generates your wallet key, and creates Start Menu shortcuts.</p>
+                <div class="cmd-block">
+                    <code>irm https://nullnaveen.github.io/Baud/install.ps1 | iex</code>
+                    <button class="copy-btn" onclick="copyCmd(this, 'irm https://nullnaveen.github.io/Baud/install.ps1 | iex')">Copy</button>
+                </div>
+                <p class="prereqs">Requires <a href="https://git-scm.com/downloads/win">Git</a>. Rust will be installed automatically if missing.</p>
+            </div>
+
+            <!-- Linux -->
+            <div class="install-box" data-platform="linux" id="platform-linux">
+                <h3><span class="icon">🐧</span> Linux / WSL</h3>
+                <p>Open your terminal and paste this command. Works on Ubuntu, Debian, Fedora, and WSL 2.</p>
+                <div class="cmd-block">
+                    <code>curl -sSL https://nullnaveen.github.io/Baud/install.sh | bash</code>
+                    <button class="copy-btn" onclick="copyCmd(this, 'curl -sSL https://nullnaveen.github.io/Baud/install.sh | bash')">Copy</button>
+                </div>
+                <p class="prereqs">Requires <a href="https://git-scm.com">Git</a> and <a href="https://curl.se">curl</a>. Rust and build tools are installed automatically.</p>
+            </div>
+
+            <!-- Manual -->
+            <div class="install-box" data-platform="manual" id="platform-manual">
+                <h3><span class="icon">⚙️</span> Build from Source</h3>
+                <p>Clone the repository and build with Cargo. Requires Rust 1.70+ and Git.</p>
+                <div class="cmd-block">
+                    <code>git clone https://github.com/NullNaveen/Baud.git &amp;&amp; cd Baud &amp;&amp; cargo build --bin baud-node --release</code>
+                    <button class="copy-btn" onclick="copyCmd(this, 'git clone https://github.com/NullNaveen/Baud.git && cd Baud && cargo build --bin baud-node --release')">Copy</button>
+                </div>
+                <p>Then run the node:</p>
+                <div class="cmd-block">
+                    <code>./target/release/baud-node --secret-key YOUR_64_HEX_KEY --genesis genesis.json</code>
+                    <button class="copy-btn" onclick="copyCmd(this, './target/release/baud-node --secret-key YOUR_64_HEX_KEY --genesis genesis.json')">Copy</button>
+                </div>
+                <p class="prereqs">Generate a 64-character hex secret key: <code style="color:var(--cyan)">openssl rand -hex 32</code></p>
+            </div>
+
+            <!-- GitHub Releases -->
+            <div class="alt-section">
+                <h2>GitHub Releases</h2>
+                <p style="color:var(--text-secondary); margin-bottom: 16px;">Browse release notes and changelogs on GitHub.</p>
+                <a href="https://github.com/NullNaveen/Baud/releases" class="release-btn">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                    View Releases on GitHub
+                </a>
+            </div>
+
+            <!-- After Installation -->
+            <h2 class="section-title">After Installation</h2>
+            <p class="section-desc">The installer builds Baud, generates your wallet key, and sets everything up. Here's what happens next.</p>
+
+            <div class="step-grid">
+                <div class="step-card">
+                    <div class="step-num">1</div>
+                    <div class="step-body">
+                        <h4>Save Your Secret Key</h4>
+                        <p>The installer prints a 64-character hex key. <strong style="color:var(--gold)">Write it down and keep it safe.</strong> This is the only way to access your BAUD. If you lose it, your funds are gone forever.</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-num">2</div>
+                    <div class="step-body">
+                        <h4>Start the Node</h4>
+                        <p>On Windows, click <strong>"Baud Node"</strong> in the Start Menu — or run <code style="color:var(--cyan)">start-node.bat</code>. On Linux, run <code style="color:var(--cyan)">baud-start</code>. The node begins mining immediately.</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-num">3</div>
+                    <div class="step-body">
+                        <h4>Open the Dashboard</h4>
+                        <p>On Windows, click <strong>"Baud Dashboard"</strong> in the Start Menu. Or open your browser and go to <code style="color:var(--cyan)">http://localhost:8080</code>. You'll see your balance, block height, and mining status in real time.</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-num">4</div>
+                    <div class="step-body">
+                        <h4>You're Mining!</h4>
+                        <p>That's it. You earn 500 BAUD per block (~1 second). Keep the node running to accumulate rewards. Use the Dashboard to send transactions, create escrows, and manage your wallet.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start Menu Icons (Windows) -->
+            <h2 class="section-title">Start Menu Icons (Windows)</h2>
+            <p class="section-desc">The Windows installer creates three shortcuts in your Start Menu for quick access.</p>
+
+            <div class="icon-grid">
+                <div class="icon-card">
+                    <div class="icon-emoji">🟢</div>
+                    <h4>Baud Node</h4>
+                    <p>Starts the baud-node process and opens the Dashboard in your browser. This is your primary shortcut — it begins mining and gives you the UI.</p>
+                    <span class="badge badge-green">Start Mining</span>
+                </div>
+                <div class="icon-card">
+                    <div class="icon-emoji">📊</div>
+                    <h4>Baud Dashboard</h4>
+                    <p>Opens <code style="color:var(--cyan)">localhost:8080</code> in your default browser. Use this if the node is already running and you just want to view the dashboard.</p>
+                    <span class="badge badge-cyan">View Only</span>
+                </div>
+                <div class="icon-card">
+                    <div class="icon-emoji">🔴</div>
+                    <h4>Stop Baud Node</h4>
+                    <p>Gracefully stops the baud-node process. Mining stops and your node goes offline. Your balance is saved — restart anytime to resume.</p>
+                    <span class="badge badge-pink">Stop Mining</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-left">MIT License · Baud © 2025</div>
+                <ul class="footer-links">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="faq.html">FAQ</a></li>
+                    <li><a href="https://github.com/NullNaveen/Baud">GitHub</a></li>
+                    <li><a href="https://github.com/NullNaveen/Baud/blob/main/docs/whitepaper.md">Whitepaper</a></li>
+                </ul>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    function showPlatform(name) {
+        document.querySelectorAll('.install-box').forEach(function(el) { el.classList.remove('active'); });
+        document.querySelectorAll('.platform-tab').forEach(function(el) { el.classList.remove('active'); });
+        document.getElementById('platform-' + name).classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    function copyCmd(btn, text) {
+        navigator.clipboard.writeText(text).then(function() {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        });
+    }
+
+    function toggleTheme() {
+        var html = document.documentElement;
+        var next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('baud-theme', next);
+        document.getElementById('theme-icon').textContent = next === 'light' ? '🌙' : '☀️';
+        document.getElementById('theme-label').textContent = next === 'light' ? 'Dark' : 'Light';
+    }
+    (function() {
+        var saved = localStorage.getItem('baud-theme');
+        if (saved === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+            var icon = document.getElementById('theme-icon');
+            var label = document.getElementById('theme-label');
+            if (icon) icon.textContent = '🌙';
+            if (label) label.textContent = 'Dark';
+        }
+    })();
+    </script>
+</body>
+</html>

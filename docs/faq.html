@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ — Baud Cryptocurrency</title>
+    <meta name="description" content="Frequently asked questions about Baud — mining, security, escrow, supply, and more.">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050510; --bg-alt: #0a0a1a; --surface: #0f0f20; --surface-hover: #141430;
+            --border: #1a1a35; --border-light: #252545; --text: #e8e8f0; --text-secondary: #a0a0b8;
+            --muted: #707088; --primary: #8b5cf6; --primary-light: #a78bfa; --primary-glow: rgba(139,92,246,0.15);
+            --gold: #f5a623; --gold-light: #ffc857; --green: #22c55e; --cyan: #06b6d4; --pink: #ec4899;
+        }
+        [data-theme="light"] {
+            --bg: #f8f9fc; --bg-alt: #f0f1f5; --surface: #ffffff; --surface-hover: #f5f5fa;
+            --border: #e0e2e8; --border-light: #d0d3dc; --text: #1a1a2e; --text-secondary: #4a4a65;
+            --muted: #6a6a80; --primary: #7c3aed; --primary-light: #6d28d9; --primary-glow: rgba(139,92,246,0.08);
+            --gold: #d4890c; --gold-light: #b8740a; --green: #16a34a; --cyan: #0891b2; --pink: #db2777;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        .container { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+        a { color: var(--primary-light); text-decoration: none; } a:hover { text-decoration: underline; }
+        nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 16px 0; background: rgba(5,5,16,0.85); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(26,26,53,0.5); }
+        [data-theme="light"] nav { background: rgba(248,249,252,0.88); border-bottom-color: rgba(0,0,0,0.08); }
+        .nav-inner { max-width: 860px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
+        .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
+        .nav-logo svg { width: 32px; height: 32px; } .nav-logo span { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+        .nav-links { display: flex; align-items: center; gap: 24px; list-style: none; }
+        .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; } .nav-links a:hover { color: var(--text); }
+        .nav-cta { padding: 8px 20px; background: var(--primary); color: white !important; border-radius: 8px; font-weight: 600 !important; transition: background 0.2s; }
+        .nav-cta:hover { background: var(--primary-light); }
+        .theme-toggle-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); padding: 7px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; font-family: 'Inter', sans-serif; }
+        .theme-toggle-btn:hover { border-color: var(--border-light); color: var(--text); }
+        main { padding: 120px 0 80px; }
+        h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
+        .subtitle { color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 48px; }
+        .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; margin-bottom: 16px; transition: border-color 0.2s; }
+        .faq-item:hover { border-color: var(--border-light); }
+        .faq-item h3 { font-size: 1.05rem; font-weight: 600; color: var(--primary-light); margin-bottom: 12px; line-height: 1.4; }
+        .faq-item p { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.7; }
+        .faq-item p strong { color: var(--text); }
+        .faq-item + .faq-section { margin-top: 48px; }
+        .faq-section { margin-bottom: 24px; }
+        .faq-section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+        .faq-section h2 .icon { font-size: 1.3rem; }
+        .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 24px; }
+        .back-link:hover { color: var(--text); text-decoration: none; }
+        footer { padding: 40px 0; border-top: 1px solid var(--border); }
+        .footer-inner { display: flex; justify-content: space-between; align-items: center; }
+        .footer-left { color: var(--muted); font-size: 0.85rem; }
+        .footer-links { display: flex; gap: 24px; list-style: none; }
+        .footer-links a { color: var(--muted); text-decoration: none; font-size: 0.85rem; } .footer-links a:hover { color: var(--text); }
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; } .nav-links { display: none; }
+            .faq-item { padding: 20px; } .footer-inner { flex-direction: column; gap: 16px; }
+        }
+        [data-theme="light"] .faq-item { box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs><rect width="32" height="32" rx="6" fill="url(#g)"/><rect x="8" y="6.5" width="3" height="19" rx="1.5" fill="white"/><rect x="7" y="6.5" width="5" height="2.5" rx="0.8" fill="white"/><rect x="7" y="14.75" width="5" height="2.5" rx="0.8" fill="white"/><rect x="7" y="23" width="5" height="2.5" rx="0.8" fill="white"/><path d="M11 7.5 H15 C18 7.5 20.5 9.5 20.5 12 C20.5 14.5 18 16.5 15 16.5 H11" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 15 H16 C19.5 15 22.5 17.2 22.5 20 C22.5 22.8 19.5 25 16 25 H11" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="8" r="2.5" fill="#22c55e"/><path d="M25.5 6.5 C27.5 5.3 29 6.5 27.8 8.5" fill="none" stroke="#22c55e" stroke-width="1" stroke-linecap="round" opacity="0.6"/></svg>
+                <span>Baud</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="download.html">Download</a></li>
+                <li><a href="faq.html" style="color:var(--text)">FAQ</a></li>
+                <li><button class="theme-toggle-btn" onclick="toggleTheme()"><span id="theme-icon">☀️</span><span id="theme-label">Light</span></button></li>
+                <li><a href="https://github.com/NullNaveen/Baud" class="nav-cta">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main>
+        <div class="container">
+            <a href="index.html" class="back-link">← Back to Home</a>
+            <h1>Frequently Asked Questions</h1>
+            <p class="subtitle">Everything you need to know about Baud — what it is, how it works, and how to mine.</p>
+
+            <!-- General -->
+            <div class="faq-section">
+                <h2><span class="icon">💡</span> General</h2>
+            </div>
+
+            <div class="faq-item">
+                <h3>What is Baud and why does it exist?</h3>
+                <p>Baud is a cryptocurrency designed from the ground up for <strong>machine-to-machine (M2M) payments</strong>. As AI agents become more autonomous, they need a way to pay each other for services — inference, data, compute, storage. Baud provides instant, feeless transactions with built-in escrow, so AI agents can transact trustlessly without human intervention.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>How is Baud different from Bitcoin or Ethereum?</h3>
+                <p><strong>Speed:</strong> Baud produces blocks every ~1 second vs Bitcoin's 10 minutes. <strong>Fees:</strong> Baud transactions are completely free — no gas fees. <strong>Purpose:</strong> While Bitcoin is "digital gold" and Ethereum is a general smart contract platform, Baud is purpose-built for AI agent economies. <strong>Escrow:</strong> Built-in hash-time-locked escrow for trustless M2M deals, not requiring complex smart contracts.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Is Baud open source?</h3>
+                <p>Yes. Baud is fully open source under the MIT license. The entire codebase — all 8 crates — is available on <a href="https://github.com/NullNaveen/Baud">GitHub</a>. Anyone can audit, fork, or contribute.</p>
+            </div>
+
+            <!-- Security -->
+            <div class="faq-section">
+                <h2><span class="icon">🔐</span> Security</h2>
+            </div>
+
+            <div class="faq-item">
+                <h3>Is Baud secure? Can someone steal my funds?</h3>
+                <p>Baud uses <strong>Ed25519</strong> cryptography (the same used by Signal, SSH, and Tor) for signing transactions, and <strong>AES-256-GCM</strong> with Argon2id for wallet encryption. Your funds are safe as long as you keep your secret key private. No one can move your BAUD without your 64-character secret key — there is no backdoor, no admin override, and no "forgot password" recovery.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What happens if I lose my secret key?</h3>
+                <p><strong>All BAUD at that address is permanently lost.</strong> There is no recovery mechanism, no customer support, and no way to reset it. This is by design — it means nobody else can access your funds either. Always back up your key securely.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I have multiple secret keys / wallets?</h3>
+                <p>Yes. Each secret key creates a completely separate address with its own balance. Think of it as having multiple bank accounts. Your main key (the validator key) earns mining rewards, but you can generate as many additional keys as you want from the Dashboard's Wallet page.</p>
+            </div>
+
+            <!-- Mining -->
+            <div class="faq-section">
+                <h2><span class="icon">⛏️</span> Mining</h2>
+            </div>
+
+            <div class="faq-item">
+                <h3>How does mining work? Does it waste energy?</h3>
+                <p>Unlike Bitcoin's proof-of-work, Baud uses <strong>BFT (Byzantine Fault Tolerant) consensus</strong> with round-robin leader selection. Validators take turns proposing blocks — no energy-wasting puzzle solving. If your node is running, it's mining. The reward is 500 BAUD per block (in Era 0) and blocks are produced every ~1 second.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What is the total supply? Will more BAUD be printed?</h3>
+                <p>The maximum supply is exactly <strong>1,000,000,000 BAUD</strong> (1 billion). Mining starts at 500 BAUD per block and halves every 1,000,000 blocks across 21 eras — similar to Bitcoin's scarcity model. Once all 21 eras complete, no new BAUD will ever be created. The supply schedule is hardcoded and cannot be changed.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>How long does each era last?</h3>
+                <p>Each era is <strong>1,000,000 blocks</strong>. At the default 1-second block interval, that's approximately <strong>11.6 days</strong>. Era 0 starts with a reward of 500 BAUD/block. When Era 0 ends, 50% of the total supply (500,000,000 BAUD) will have been mined. Each subsequent era halves the reward and adds half of what remains.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I mine on multiple machines to earn more?</h3>
+                <p>Baud uses BFT consensus with <strong>round-robin leader rotation</strong>. Only the designated validator for each block height can propose that block. Running a second node with the same key causes conflicts; running with a different key means that address isn't in the validator set and earns nothing. Mining throughput is determined by the consensus protocol, not by how many machines you run.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I mine when my computer is off?</h3>
+                <p>No. Mining requires the baud-node process to be actively running. When your computer is off or the node is stopped, no blocks are produced and no BAUD is earned. To mine 24/7, keep the computer running or deploy the node to a cloud server.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>How do I stop mining?</h3>
+                <p>Close the node process. On Windows, use the <strong>"Stop Baud Node"</strong> shortcut in the Start Menu, or end the baud-node process in Task Manager. On Linux, press Ctrl+C in the terminal or run <code>pkill baud-node</code>.</p>
+            </div>
+
+            <!-- Transactions & Escrow -->
+            <div class="faq-section">
+                <h2><span class="icon">💸</span> Transactions & Escrow</h2>
+            </div>
+
+            <div class="faq-item">
+                <h3>Why are there no transaction fees?</h3>
+                <p>Baud uses rate limiting instead of fees to prevent spam. Each node allows 60 requests in a burst and 20 per second sustained. This keeps the network healthy without taxing every transaction — critical for M2M micro-payments where fees would make small transactions economically impossible.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What are escrows and when would I use them?</h3>
+                <p>Escrows are built-in "trust-free deals." You lock BAUD with a hash lock and a deadline. The recipient must reveal a secret preimage to claim the funds. If the deadline passes without the reveal, the sender gets an automatic refund. <strong>Use case:</strong> An AI agent pays another agent for a task — the payment is locked in escrow until the work is proven complete.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I use Baud for real-world payments?</h3>
+                <p>Baud is primarily designed for M2M (machine-to-machine) transactions between AI agents, but it works for any peer-to-peer transfer. The zero-fee, instant-confirmation model makes it suitable for micro-payments, tipping, and any scenario where speed and cost matter more than integration with traditional finance.</p>
+            </div>
+
+            <!-- Technical -->
+            <div class="faq-section">
+                <h2><span class="icon">⚙️</span> Technical</h2>
+            </div>
+
+            <div class="faq-item">
+                <h3>What consensus mechanism does Baud use?</h3>
+                <p>Baud uses <strong>Practical Byzantine Fault Tolerance (PBFT)</strong> with deterministic round-robin leader rotation. At each block height, one validator is the designated leader. The leader proposes a block, other validators verify and vote, and when &gt;2/3 of validators agree, the block is finalized. This provides ~1 second deterministic finality.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What is the quanta unit?</h3>
+                <p>1 BAUD = 10<sup>18</sup> quanta. Quanta is the smallest indivisible unit, similar to Bitcoin's satoshi or Ethereum's wei. This allows extremely precise fractional amounts for micro-payments between AI agents.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What programming language is Baud written in?</h3>
+                <p>Baud is written entirely in <strong>safe Rust</strong> — zero unsafe code blocks. It uses Ed25519 + BLAKE3 for cryptography, Tokio for async I/O, Axum for the REST API, and sled for persistent storage. The codebase is organized into 8 modular crates.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-left">MIT License · Baud © 2025</div>
+                <ul class="footer-links">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="download.html">Download</a></li>
+                    <li><a href="https://github.com/NullNaveen/Baud">GitHub</a></li>
+                    <li><a href="https://github.com/NullNaveen/Baud/blob/main/docs/whitepaper.md">Whitepaper</a></li>
+                </ul>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    function toggleTheme() {
+        var html = document.documentElement;
+        var next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('baud-theme', next);
+        document.getElementById('theme-icon').textContent = next === 'light' ? '🌙' : '☀️';
+        document.getElementById('theme-label').textContent = next === 'light' ? 'Dark' : 'Light';
+    }
+    (function() {
+        var saved = localStorage.getItem('baud-theme');
+        if (saved === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+            var icon = document.getElementById('theme-icon');
+            var label = document.getElementById('theme-label');
+            if (icon) icon.textContent = '🌙';
+            if (label) label.textContent = 'Dark';
+        }
+    })();
+    </script>
+</body>
+</html>
