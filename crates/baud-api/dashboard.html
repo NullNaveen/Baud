@@ -96,7 +96,7 @@ code,.mono{font-family:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospa
 .stat-card .stat-label{color:var(--text2);font-size:.82em;text-transform:uppercase;letter-spacing:.06em;font-weight:500}
 .stat-card .stat-sub{color:var(--text3);font-size:.78em;margin-top:4px}
 h1,.section-title{font-family:'Space Grotesk','DM Sans',sans-serif;letter-spacing:-.01em}
-#content{max-width:1400px}
+#content{max-width:1400px;margin:0 auto;width:100%}
 
 /* Progress bar */
 .progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:8px}
@@ -175,12 +175,22 @@ tr:hover td{background:var(--card-hover)}
 
 /* Responsive */
 #mobile-toggle{display:none;position:fixed;top:12px;left:12px;z-index:200;padding:8px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;color:var(--text)}
+#mobile-backdrop{display:none;position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.5)}
+.inline-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:768px){
   #sidebar{transform:translateX(-100%)}
   #sidebar.open{transform:translateX(0)}
+  #sidebar.open~#mobile-backdrop{display:block}
   #main{margin-left:0;padding:16px}
   #mobile-toggle{display:block}
   .cards-grid{grid-template-columns:1fr}
+  .inline-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .stat-card .stat-value{font-size:1.3em}
+  .page-header h1{font-size:1.2em}
+  #main{padding:12px}
+  .card{padding:14px}
 }
 
 /* Skeleton animation */
@@ -211,9 +221,10 @@ tr:hover td{background:var(--card-hover)}
 </head>
 <body>
 
-<button id="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+<button id="mobile-toggle" onclick="var s=document.getElementById('sidebar');s.classList.toggle('open');document.getElementById('mobile-backdrop').style.display=s.classList.contains('open')?'block':'none'">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
 </button>
+<div id="mobile-backdrop" onclick="document.getElementById('sidebar').classList.remove('open');this.style.display='none'"></div>
 
 <aside id="sidebar">
   <div class="logo">
@@ -586,14 +597,14 @@ function renderDashboard() {
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
         <div>
           <div style="font-size:.8em;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:4px">Your Balance</div>
-          <div style="font-family:'Space Grotesk','DM Sans',sans-serif;font-size:2.1em;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums;font-feature-settings:'tnum'"><span id="d-balance">${myBalanceBaud}</span> <span style="font-size:.45em;color:var(--text2)">BAUD</span></div>
+          <div style="font-family:'Space Grotesk','DM Sans',sans-serif;font-size:clamp(1.3em,4vw,2.1em);font-weight:700;color:var(--green);font-variant-numeric:tabular-nums;font-feature-settings:'tnum'"><span id="d-balance">${myBalanceBaud}</span> <span style="font-size:.45em;color:var(--text2)">BAUD</span></div>
           <div id="d-ownership" style="font-size:.85em;color:var(--text2);margin-top:2px">
             ${myPctOfSupply > 0 ? `You own <strong style="color:var(--primary-light)">${myPctStr}%</strong> of the total 1 billion BAUD supply` : 'Mining in progress…'}
           </div>
         </div>
         <div style="text-align:right">
           <div style="font-size:.8em;color:var(--text3);margin-bottom:4px">Earning</div>
-          <div style="font-family:'Space Grotesk','DM Sans',sans-serif;font-size:1.4em;font-weight:600;color:var(--gold);font-feature-settings:'tnum'"><span id="d-reward">${rewardBaud}</span> <span id="d-reward-unit" style="font-size:.6em;color:var(--text2)">BAUD/block</span></div>
+          <div style="font-family:'Space Grotesk','DM Sans',sans-serif;font-size:clamp(1em,3vw,1.4em);font-weight:600;color:var(--gold);font-feature-settings:'tnum'"><span id="d-reward">${rewardBaud}</span> <span id="d-reward-unit" style="font-size:.6em;color:var(--text2)">BAUD/block</span></div>
           <div id="d-reward-min" style="font-size:.8em;color:var(--text3);margin-top:2px">≈ ${m ? fmt(m.current_block_reward_baud * 60) : '—'} BAUD/minute</div>
         </div>
       </div>
@@ -636,7 +647,7 @@ function renderDashboard() {
           <span id="d-halving">${m ? fmt(m.blocks_until_halving) : '—'} blocks until reward halves</span>
         </div>
         <div class="progress-bar"><div class="fill" id="d-era-bar" style="width:${m ? ((1 - m.blocks_until_halving/m.halving_interval)*100) : 0}%"></div></div>
-        <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.85em">
+        <div class="inline-grid" style="margin-top:16px;font-size:.85em">
           <div><span style="color:var(--text3)">Blocks Per Era</span><br><strong id="d-era-interval">${m ? fmt(m.halving_interval) : '—'}</strong></div>
           <div><span style="color:var(--text3)">Next Halving</span><br>Block <strong id="d-next-halving">#${m ? fmt(m.next_halving_block) : '—'}</strong></div>
           <div><span style="color:var(--text3)">Max Supply</span><br><strong id="d-max-supply">${m ? fmt(m.total_supply_baud) : '—'} BAUD</strong></div>
@@ -928,14 +939,14 @@ function renderNode() {
     <div class="two-col">
       <div class="card">
         <div class="section-title">Chain Details</div>
-        <table><tbody>
+        <div class="table-wrap"><table><tbody>
           <tr><td style="color:var(--text3);width:140px">Chain ID</td><td><strong>${escapeHtml(s.chain_id)}</strong></td></tr>
           <tr><td style="color:var(--text3)">Node Address</td><td class="mono copyable" onclick="copyText('${s.node_address}')">${s.node_address}</td></tr>
           <tr><td style="color:var(--text3)">State Root</td><td class="mono copyable" onclick="copyText('${s.state_root}')">${shortAddr(s.state_root)}</td></tr>
           <tr><td style="color:var(--text3)">Last Block Hash</td><td class="mono copyable" onclick="copyText('${s.last_block_hash}')">${shortAddr(s.last_block_hash)}</td></tr>
           <tr><td style="color:var(--text3)">Escrows</td><td id="n-escrows">${fmt(s.escrows)}</td></tr>
           <tr><td style="color:var(--text3)">Mempool Size</td><td id="n-mempool">${fmt(s.mempool_size)}</td></tr>
-        </tbody></table>
+        </tbody></table></div>
       </div>
       <div class="card">
         <div class="section-title">API Endpoints</div>
@@ -997,7 +1008,7 @@ async function lookupAccount() {
   el.innerHTML = `
     <div class="card">
       <div class="section-title">Account Details</div>
-      <table><tbody>
+      <div class="table-wrap"><table><tbody>
         <tr><td style="color:var(--text3);width:120px">Address</td><td class="mono copyable" onclick="copyText('${data.address}')" style="word-break:break-all">${data.address}</td></tr>
         <tr><td style="color:var(--text3)">Balance</td><td><strong style="color:var(--green);font-size:1.2em">${fmtBaud(data.balance)} BAUD</strong><br><span style="font-size:.8em;color:var(--text3)">${fmt(data.balance)} quanta</span></td></tr>
         <tr><td style="color:var(--text3)">Nonce</td><td>${data.nonce}</td></tr>
@@ -1006,7 +1017,7 @@ async function lookupAccount() {
           <tr><td style="color:var(--text3)">Endpoint</td><td>${escapeHtml(data.agent_meta.endpoint)}</td></tr>
           <tr><td style="color:var(--text3)">Capabilities</td><td>${data.agent_meta.capabilities.map(c => `<span class="badge badge-cyan">${escapeHtml(c)}</span> `).join('')}</td></tr>
         ` : ''}
-      </tbody></table>
+      </tbody></table></div>
     </div>
   `;
 }
@@ -1210,13 +1221,13 @@ async function lookupTx() {
     if (!resp.ok) { const d = await resp.json(); el.innerHTML = `<div class="alert alert-error">${escapeHtml(d.error||'Not found')}</div>`; return; }
     const data = await resp.json();
     el.innerHTML = `<div class="card" style="background:var(--bg1)">
-      <table><tbody>
+      <div class="table-wrap"><table><tbody>
         <tr><td style="color:var(--text3);width:120px">Hash</td><td class="mono" style="word-break:break-all">${escapeHtml(data.hash || hash)}</td></tr>
         <tr><td style="color:var(--text3)">Sender</td><td class="mono" style="word-break:break-all">${escapeHtml(data.sender)}</td></tr>
         <tr><td style="color:var(--text3)">Nonce</td><td>${data.nonce}</td></tr>
         <tr><td style="color:var(--text3)">Type</td><td><span class="badge badge-primary">${escapeHtml(data.tx_type || data.payload_type || 'Unknown')}</span></td></tr>
         <tr><td style="color:var(--text3)">Timestamp</td><td>${new Date(data.timestamp).toLocaleString()}</td></tr>
-      </tbody></table>
+      </tbody></table></div>
     </div>`;
   } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
 }
@@ -1232,14 +1243,14 @@ async function lookupEscrow() {
     const data = await resp.json();
     const statusColor = data.status === 'Active' ? 'var(--green)' : data.status === 'Released' ? 'var(--primary)' : 'var(--text3)';
     el.innerHTML = `<div class="card" style="background:var(--bg1)">
-      <table><tbody>
+      <div class="table-wrap"><table><tbody>
         <tr><td style="color:var(--text3);width:120px">Escrow ID</td><td class="mono" style="word-break:break-all">${escapeHtml(data.id || id)}</td></tr>
         <tr><td style="color:var(--text3)">Status</td><td><strong style="color:${statusColor}">${escapeHtml(data.status)}</strong></td></tr>
         <tr><td style="color:var(--text3)">Sender</td><td class="mono" style="word-break:break-all">${escapeHtml(data.sender)}</td></tr>
         <tr><td style="color:var(--text3)">Recipient</td><td class="mono" style="word-break:break-all">${escapeHtml(data.recipient)}</td></tr>
         <tr><td style="color:var(--text3)">Amount</td><td><strong>${fmtBaud(data.amount)} BAUD</strong></td></tr>
         <tr><td style="color:var(--text3)">Deadline</td><td>${data.deadline}</td></tr>
-      </tbody></table>
+      </tbody></table></div>
     </div>`;
   } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
 }
@@ -1359,7 +1370,7 @@ function renderHelp() {
 
     <div class="card" style="margin-bottom:20px">
       <div class="section-title">Dashboard Pages Explained</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:.93em">
+      <div class="inline-grid" style="gap:16px;font-size:.93em">
         <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--primary)">
           <strong style="color:var(--primary)">Dashboard</strong>
           <p style="color:var(--text2);margin-top:4px;line-height:1.5">Your home screen. Shows your BAUD balance, mining rewards, block production stats, and a quick overview of the entire network at a glance.</p>
