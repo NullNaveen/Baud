@@ -17,6 +17,14 @@ from baud_sdk.transactions import (
     escrow_refund,
     agent_register,
 )
+from baud_sdk.signing import (
+    NativeKeyPair,
+    sign_transfer,
+    sign_escrow_create,
+    sign_escrow_release,
+    sign_escrow_refund,
+    sign_agent_register,
+)
 
 
 class BaudClient:
@@ -24,19 +32,24 @@ class BaudClient:
 
     Args:
         node_url: Base URL of the node (e.g., "http://localhost:8080").
-        keypair: Optional keypair for signing transactions.
-        baud_bin: Optional path to the baud CLI binary.
+        keypair: Optional KeyPair (CLI-based) for signing transactions.
+        native_keypair: Optional NativeKeyPair (pure Python) for signing.
+        baud_bin: Optional path to the baud CLI binary (only for CLI mode).
     """
 
     def __init__(
         self,
         node_url: str = "http://localhost:8080",
         keypair: Optional[KeyPair] = None,
+        native_keypair: Optional[NativeKeyPair] = None,
         baud_bin: Optional[str] = None,
+        chain_id: str = "baud-mainnet",
     ):
         self.node_url = node_url.rstrip("/")
         self.keypair = keypair
+        self.native_keypair = native_keypair
         self.baud_bin = baud_bin
+        self.chain_id = chain_id
 
     def _get(self, path: str) -> dict:
         url = f"{self.node_url}{path}"
@@ -186,3 +199,106 @@ class BaudClient:
             nonce = self.nonce(kp.address)
         tx = agent_register(kp.secret_key, name, endpoint, capabilities, nonce, self.baud_bin)
         return self.submit(tx)
+
+    # ── Pure Python signing (no CLI binary needed) ───────────────────
+
+    @classmethod
+    def from_secret(
+        cls,
+        secret_hex: str,
+        node_url: str = "http://localhost:8080",
+        chain_id: str = "baud-mainnet",
+    ) -> BaudClient:
+        """Create a client with pure Python signing (no baud CLI needed).
+
+        Args:
+            secret_hex: Hex-encoded 32-byte secret key.
+            node_url: Base URL of the node.
+            chain_id: Chain ID for transaction signing.
+        """
+        nkp = NativeKeyPair.from_secret_hex(secret_hex)
+        return cls(node_url=node_url, native_keypair=nkp, chain_id=chain_id)
+
+    def _require_native_keypair(self) -> NativeKeyPair:
+        if self.native_keypair is None:
+            raise ValueError(
+                "No native keypair set. Use BaudClient.from_secret() or pass native_keypair=."
+            )
+        return self.native_keypair
+
+    def native_send(
+        self,
+        to: str,
+        amount: int,
+        memo: Optional[str] = None,
+        nonce: Optional[int] = None,
+    ) -> dict:
+        """Sign and submit a transfer using pure Python signing."""
+        nkp = self._require_native_keypair()
+        if nonce is None:
+            nonce = self.nonce(nkp.address_hex)
+        tx = sign_transfer(nkp, to, amount, nonce, self.chain_id, memo)
+        return self.submit_raw(tx)
+
+    def native_create_escrow(
+        self,
+        recipient: str,
+        amount: int,
+        preimage: str,
+        deadline: int,
+        nonce: Optional[int] = None,
+    ) -> dict:
+        """Sign and submit an escrow using pure Python signing."""
+        nkp = self._require_native_keypair()
+        if nonce is None:
+            nonce = self.nonce(nkp.address_hex)
+        tx = sign_escrow_create(nkp, recipient, amount, preimage, deadline, nonce, self.chain_id)
+        return self.submit_raw(tx)
+
+    def native_release_escrow(
+        self,
+        escrow_id: str,
+        preimage: str,
+        nonce: Optional[int] = None,
+    ) -> dict:
+        """Sign and submit an escrow release using pure Python signing."""
+        nkp = self._require_native_keypair()
+        if nonce is None:
+            nonce = self.nonce(nkp.address_hex)
+        tx = sign_escrow_release(nkp, escrow_id, preimage, nonce, self.chain_id)
+        return self.submit_raw(tx)
+
+    def native_refund_escrow(
+        self,
+        escrow_id: str,
+        nonce: Optional[int] = None,
+    ) -> dict:
+        """Sign and submit an escrow refund using pure Python signing."""
+        nkp = self._require_native_keypair()
+        if nonce is None:
+            nonce = self.nonce(nkp.address_hex)
+        tx = sign_escrow_refund(nkp, escrow_id, nonce, self.chain_id)
+        return self.submit_raw(tx)
+
+    def native_register_agent(
+        self,
+        name: str,
+        endpoint: str,
+        capabilities: list[str],
+        nonce: Optional[int] = None,
+    ) -> dict:
+        """Sign and submit an agent registration using pure Python signing."""
+        nkp = self._require_native_keypair()
+        if nonce is None:
+            nonce = self.nonce(nkp.address_hex)
+        tx = sign_agent_register(nkp, name, endpoint, capabilities, nonce, self.chain_id)
+        return self.submit_raw(tx)
+
+    @property
+    def address(self) -> str:
+        """Get the address of the active keypair."""
+        if self.native_keypair:
+            return self.native_keypair.address_hex
+        if self.keypair:
+            return self.keypair.address
+        raise ValueError("No keypair configured")

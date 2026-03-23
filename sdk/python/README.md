@@ -8,35 +8,31 @@ Python SDK for the [Baud](https://github.com/NullNaveen/Baud) M2M Agent Ledger.
 pip install baud-sdk
 ```
 
-**Prerequisite:** The `baud` CLI binary must be installed and on your PATH:
-
-```bash
-# From the Baud repo root
-cargo install --path crates/baud-cli
-```
+This installs everything needed — **no external binaries required**.
 
 ## Quick Start
 
 ```python
-from baud_sdk import BaudClient, KeyPair, QUANTA_PER_BAUD
+from baud_sdk import BaudClient, NativeKeyPair, QUANTA_PER_BAUD
 
-# Generate a new agent identity
-kp = KeyPair.generate()
-print(f"Address: {kp.address}")
+# Generate a new agent identity (pure Python, no CLI needed)
+kp = NativeKeyPair.generate()
+print(f"Address: {kp.address_hex}")
+print(f"Secret:  {kp.secret_hex}")
 
-# Connect to a node
-client = BaudClient("http://localhost:8080", keypair=kp)
+# Connect to a node with pure Python signing
+client = BaudClient.from_secret(kp.secret_hex, node_url="http://localhost:8080")
 
 # Send 1 BAUD
-result = client.send(to="<recipient-address>", amount=QUANTA_PER_BAUD)
+result = client.native_send(to="<recipient-address>", amount=QUANTA_PER_BAUD)
 print(f"TX hash: {result['tx_hash']}")
 
 # Check balance
-balance = client.balance(kp.address)
+balance = client.balance(kp.address_hex)
 print(f"Balance: {balance} quanta = {balance / QUANTA_PER_BAUD} BAUD")
 
 # Create escrow
-client.create_escrow(
+client.native_create_escrow(
     recipient="<worker-address>",
     amount=500 * QUANTA_PER_BAUD,
     preimage="proof_of_delivery",
@@ -44,23 +40,45 @@ client.create_escrow(
 )
 
 # Register agent identity
-client.register_agent(
+client.native_register_agent(
     name="my-agent",
     endpoint="https://api.myagent.ai",
     capabilities=["llm", "inference"],
 )
 ```
 
+## For AI Agents
+
+An AI agent only needs to run `pip install baud-sdk` — no Rust, no compiling, no CLI binary.
+
+```python
+from baud_sdk import BaudClient
+
+# Agent connects with its secret key
+client = BaudClient.from_secret("your_secret_key_hex", node_url="http://node-ip:8080")
+
+# Pay for a service
+client.native_send(to="service_provider_address", amount=10**18, memo="image-gen-job-42")
+
+# Check balance
+client.balance(client.address)
+```
+
 ## API Reference
 
-### `KeyPair`
+### `NativeKeyPair` (recommended — pure Python)
 
-- `KeyPair.generate()` — Generate a new random keypair
-- `KeyPair.from_secret(hex)` — Restore from a hex secret key
-- `.address` — Hex-encoded agent address
-- `.secret_key` — Hex-encoded secret key
+- `NativeKeyPair.generate()` — Generate a new random keypair
+- `NativeKeyPair.from_secret_hex(hex)` — Restore from a hex secret key
+- `.address_hex` — Hex-encoded agent address
+- `.secret_hex` — Hex-encoded secret key
+- `.sign(message)` — Sign raw bytes
 
 ### `BaudClient`
+
+**Create:**
+- `BaudClient.from_secret(secret_hex, node_url, chain_id)` — Pure Python client (recommended)
+- `BaudClient(node_url, keypair=kp)` — CLI-based client (legacy)
 
 **Query methods:**
 - `client.status()` — Node status
@@ -71,7 +89,14 @@ client.register_agent(
 - `client.get_tx(hash)` — Transaction lookup
 - `client.mempool()` — Pending transactions
 
-**Transaction methods (auto-sign + submit):**
+**Native signing methods (pure Python, recommended):**
+- `client.native_send(to, amount, memo=None, nonce=None)`
+- `client.native_create_escrow(recipient, amount, preimage, deadline, nonce=None)`
+- `client.native_release_escrow(escrow_id, preimage, nonce=None)`
+- `client.native_refund_escrow(escrow_id, nonce=None)`
+- `client.native_register_agent(name, endpoint, capabilities, nonce=None)`
+
+**CLI-based methods (requires baud binary, legacy):**
 - `client.send(to, amount, memo=None, nonce=None)`
 - `client.create_escrow(recipient, amount, preimage, deadline, nonce=None)`
 - `client.release_escrow(escrow_id, preimage, nonce=None)`
