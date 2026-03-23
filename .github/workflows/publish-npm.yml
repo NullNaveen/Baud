@@ -1,5 +1,10 @@
 name: Publish MCP Server to npm
 
+# Requires NPM_TOKEN secret:
+#   1. Create an npm account at https://www.npmjs.com/signup
+#   2. Generate an access token: npm token create --type=publish
+#   3. Add as repo secret: Settings > Secrets > Actions > New > NPM_TOKEN
+
 on:
   release:
     types: [published]

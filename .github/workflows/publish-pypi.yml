@@ -1,5 +1,14 @@
 name: Publish Python SDK to PyPI
 
+# Requires PyPI Trusted Publisher setup:
+#   1. Create a PyPI account at https://pypi.org/account/register/
+#   2. Create the project: https://pypi.org/manage/account/publishing/
+#   3. Add trusted publisher with:
+#      - Owner: NullNaveen
+#      - Repository: Baud
+#      - Workflow: publish-pypi.yml
+#      - Environment: pypi
+
 on:
   release:
     types: [published]
