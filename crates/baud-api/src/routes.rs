@@ -25,7 +25,7 @@ use axum::response::Html;
 use baud_core::crypto::{Address, Hash, KeyPair, Signature};
 use baud_core::mempool::Mempool;
 use baud_core::state::WorldState;
-use baud_core::types::{EscrowStatus, Transaction, TxPayload};
+use baud_core::types::{EscrowStatus, Transaction, TxPayload, RecurringPaymentStatus, AgreementStatus, ProposalStatus};
 
 static DASHBOARD_HTML: &str = include_str!("../dashboard.html");
 
@@ -79,6 +79,59 @@ pub enum TxPayloadDto {
         name: String,
         endpoint: String,
         capabilities: Vec<String>,
+    },
+    SetSpendingPolicy {
+        auto_approve_limit: u128,
+        co_signers: Vec<String>,
+        required_co_signers: u32,
+    },
+    CoSignedTransfer {
+        to: String,
+        amount: u128,
+        memo: Option<String>,
+        co_signatures: Vec<(String, String)>,
+    },
+    UpdateAgentPricing {
+        price_per_request: u128,
+        billing_model: String,
+        sla_description: String,
+    },
+    RateAgent {
+        target: String,
+        rating: u8,
+    },
+    CreateRecurringPayment {
+        recipient: String,
+        amount_per_period: u128,
+        interval_ms: u64,
+        max_payments: u32,
+    },
+    CancelRecurringPayment {
+        payment_id: String,
+    },
+    CreateServiceAgreement {
+        provider: String,
+        description: String,
+        payment_amount: u128,
+        deadline: u64,
+    },
+    AcceptServiceAgreement {
+        agreement_id: String,
+    },
+    CompleteServiceAgreement {
+        agreement_id: String,
+    },
+    DisputeServiceAgreement {
+        agreement_id: String,
+    },
+    CreateProposal {
+        title: String,
+        description: String,
+        voting_deadline: u64,
+    },
+    CastVote {
+        proposal_id: String,
+        in_favor: bool,
     },
 }
 
@@ -261,6 +314,10 @@ pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Ro
         .route("/v1/mining", get(get_mining_info))
         .route("/v1/keygen", get(keygen))
         .route("/v1/sign-and-submit", post(sign_and_submit))
+        .route("/v1/reputation/:address", get(get_reputation))
+        .route("/v1/pricing/:address", get(get_pricing))
+        .route("/v1/proposal/:id", get(get_proposal))
+        .route("/v1/agreement/:id", get(get_agreement))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
         .layer(middleware::from_fn_with_state(
             limiter,
@@ -991,6 +1048,199 @@ fn parse_tx_request(
             endpoint: endpoint.into_bytes(),
             capabilities: capabilities.into_iter().map(|c| c.into_bytes()).collect(),
         },
+        TxPayloadDto::SetSpendingPolicy {
+            auto_approve_limit,
+            co_signers,
+            required_co_signers,
+        } => {
+            let addrs: Result<Vec<Address>, _> = co_signers
+                .iter()
+                .map(|s| Address::from_hex(s))
+                .collect();
+            let addrs = addrs.map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid co-signer address: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::SetSpendingPolicy {
+                auto_approve_limit,
+                co_signers: addrs,
+                required_co_signers,
+            }
+        }
+        TxPayloadDto::CoSignedTransfer {
+            to,
+            amount,
+            memo,
+            co_signatures,
+        } => {
+            let to_addr = Address::from_hex(&to).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid recipient address: {e}"),
+                    }),
+                )
+            })?;
+            let sigs: Result<Vec<(Address, Signature)>, _> = co_signatures
+                .iter()
+                .map(|(addr, sig)| {
+                    Ok((Address::from_hex(addr)?, Signature::from_hex(sig)?))
+                })
+                .collect();
+            let sigs = sigs.map_err(|e: Box<dyn std::error::Error>| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid co-signature: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::CoSignedTransfer {
+                to: to_addr,
+                amount,
+                memo: memo.map(|m| m.into_bytes()),
+                co_signatures: sigs,
+            }
+        }
+        TxPayloadDto::UpdateAgentPricing {
+            price_per_request,
+            billing_model,
+            sla_description,
+        } => TxPayload::UpdateAgentPricing {
+            price_per_request,
+            billing_model: billing_model.into_bytes(),
+            sla_description: sla_description.into_bytes(),
+        },
+        TxPayloadDto::RateAgent { target, rating } => {
+            let target_addr = Address::from_hex(&target).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid target address: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::RateAgent {
+                target: target_addr,
+                rating,
+            }
+        }
+        TxPayloadDto::CreateRecurringPayment {
+            recipient,
+            amount_per_period,
+            interval_ms,
+            max_payments,
+        } => {
+            let to_addr = Address::from_hex(&recipient).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid recipient address: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::CreateRecurringPayment {
+                recipient: to_addr,
+                amount_per_period,
+                interval_ms,
+                max_payments,
+            }
+        }
+        TxPayloadDto::CancelRecurringPayment { payment_id } => {
+            let pid = Hash::from_hex(&payment_id).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid payment_id: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::CancelRecurringPayment { payment_id: pid }
+        }
+        TxPayloadDto::CreateServiceAgreement {
+            provider,
+            description,
+            payment_amount,
+            deadline,
+        } => {
+            let provider_addr = Address::from_hex(&provider).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid provider address: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::CreateServiceAgreement {
+                provider: provider_addr,
+                description: description.into_bytes(),
+                payment_amount,
+                deadline,
+            }
+        }
+        TxPayloadDto::AcceptServiceAgreement { agreement_id } => {
+            let aid = Hash::from_hex(&agreement_id).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid agreement_id: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::AcceptServiceAgreement { agreement_id: aid }
+        }
+        TxPayloadDto::CompleteServiceAgreement { agreement_id } => {
+            let aid = Hash::from_hex(&agreement_id).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid agreement_id: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::CompleteServiceAgreement { agreement_id: aid }
+        }
+        TxPayloadDto::DisputeServiceAgreement { agreement_id } => {
+            let aid = Hash::from_hex(&agreement_id).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid agreement_id: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::DisputeServiceAgreement { agreement_id: aid }
+        }
+        TxPayloadDto::CreateProposal {
+            title,
+            description,
+            voting_deadline,
+        } => TxPayload::CreateProposal {
+            title: title.into_bytes(),
+            description: description.into_bytes(),
+            voting_deadline,
+        },
+        TxPayloadDto::CastVote {
+            proposal_id,
+            in_favor,
+        } => {
+            let pid = Hash::from_hex(&proposal_id).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid proposal_id: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::CastVote {
+                proposal_id: pid,
+                in_favor,
+            }
+        }
     };
 
     Ok(Transaction {
@@ -1001,4 +1251,169 @@ fn parse_tx_request(
         chain_id: req.chain_id,
         signature,
     })
+}
+
+// ─── Extended State Query Handlers ──────────────────────────────────────────
+
+async fn get_reputation(
+    State(state): State<AppState>,
+    Path(address): Path<String>,
+) -> impl IntoResponse {
+    let addr = match Address::from_hex(&address) {
+        Ok(a) => a,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("invalid address: {e}")})),
+            )
+                .into_response()
+        }
+    };
+    let ws = state.world_state.read();
+    match ws.extended.reputation.get(&addr) {
+        Some(rep) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "address": addr.to_hex(),
+                "total_score": rep.total_score,
+                "rating_count": rep.rating_count,
+                "average_score": rep.average_score(),
+                "successful_jobs": rep.successful_jobs,
+                "failed_jobs": rep.failed_jobs,
+            })),
+        )
+            .into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "no reputation data for this address"})),
+        )
+            .into_response(),
+    }
+}
+
+async fn get_pricing(
+    State(state): State<AppState>,
+    Path(address): Path<String>,
+) -> impl IntoResponse {
+    let addr = match Address::from_hex(&address) {
+        Ok(a) => a,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("invalid address: {e}")})),
+            )
+                .into_response()
+        }
+    };
+    let ws = state.world_state.read();
+    match ws.extended.agent_pricing.get(&addr) {
+        Some(p) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "address": addr.to_hex(),
+                "price_per_request": p.price_per_request.to_string(),
+                "billing_model": String::from_utf8_lossy(&p.billing_model),
+                "sla_description": String::from_utf8_lossy(&p.sla_description),
+            })),
+        )
+            .into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "no pricing data for this address"})),
+        )
+            .into_response(),
+    }
+}
+
+async fn get_proposal(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let pid = match Hash::from_hex(&id) {
+        Ok(h) => h,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("invalid proposal id: {e}")})),
+            )
+                .into_response()
+        }
+    };
+    let ws = state.world_state.read();
+    match ws.extended.proposals.get(&pid) {
+        Some(p) => {
+            let status_str = match p.status {
+                ProposalStatus::Active => "active",
+                ProposalStatus::Passed => "passed",
+                ProposalStatus::Rejected => "rejected",
+                ProposalStatus::Executed => "executed",
+            };
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "id": pid.to_hex(),
+                    "proposer": p.proposer.to_hex(),
+                    "title": String::from_utf8_lossy(&p.title),
+                    "description": String::from_utf8_lossy(&p.description),
+                    "voting_deadline": p.voting_deadline,
+                    "votes_for": p.votes_for,
+                    "votes_against": p.votes_against,
+                    "quorum": p.quorum,
+                    "status": status_str,
+                })),
+            )
+                .into_response()
+        }
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "proposal not found"})),
+        )
+            .into_response(),
+    }
+}
+
+async fn get_agreement(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let aid = match Hash::from_hex(&id) {
+        Ok(h) => h,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("invalid agreement id: {e}")})),
+            )
+                .into_response()
+        }
+    };
+    let ws = state.world_state.read();
+    match ws.extended.service_agreements.get(&aid) {
+        Some(a) => {
+            let status_str = match a.status {
+                AgreementStatus::Proposed => "proposed",
+                AgreementStatus::Accepted => "accepted",
+                AgreementStatus::Completed => "completed",
+                AgreementStatus::Disputed => "disputed",
+                AgreementStatus::Cancelled => "cancelled",
+            };
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "id": aid.to_hex(),
+                    "client": a.client.to_hex(),
+                    "provider": a.provider.to_hex(),
+                    "description": String::from_utf8_lossy(&a.description),
+                    "payment_amount": a.payment_amount.to_string(),
+                    "deadline": a.deadline,
+                    "status": status_str,
+                })),
+            )
+                .into_response()
+        }
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "agreement not found"})),
+        )
+            .into_response(),
+    }
 }
