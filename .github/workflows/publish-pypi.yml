@@ -1,13 +1,9 @@
 name: Publish Python SDK to PyPI
 
-# Requires PyPI Trusted Publisher setup:
+# Requires PYPI_API_TOKEN secret:
 #   1. Create a PyPI account at https://pypi.org/account/register/
-#   2. Create the project: https://pypi.org/manage/account/publishing/
-#   3. Add trusted publisher with:
-#      - Owner: NullNaveen
-#      - Repository: Baud
-#      - Workflow: publish-pypi.yml
-#      - Environment: pypi
+#   2. Generate an API token: Account Settings > API tokens > Add API token
+#   3. Add as repo secret: Settings > Secrets > Actions > New > PYPI_API_TOKEN
 
 on:
   release:
@@ -17,9 +13,6 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,3 +27,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: sdk/python/dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
