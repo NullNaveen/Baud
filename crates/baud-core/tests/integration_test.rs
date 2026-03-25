@@ -617,3 +617,385 @@ fn spending_policy_set() {
     assert_eq!(policy.co_signers.len(), 1);
     assert_eq!(policy.required_co_signers, 1);
 }
+
+// ─── Co-Signed Transfer Tests ───────────────────────────────────────────
+
+/// Test co-signed transfer succeeds with proper co-signer approval.
+#[test]
+fn co_signed_transfer_works() {
+    let alice = KeyPair::generate();
+    let bob = KeyPair::generate();
+    let cosigner = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state.accounts.insert(
+        alice.address(),
+        Account::with_balance(alice.address(), 10_000),
+    );
+
+    // Set spending policy: auto-approve up to 500, 1 co-signer for more.
+    let mut policy_tx = Transaction {
+        sender: alice.address(),
+        nonce: 0,
+        payload: TxPayload::SetSpendingPolicy {
+            auto_approve_limit: 500,
+            co_signers: vec![cosigner.address()],
+            required_co_signers: 1,
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = policy_tx.signable_hash();
+    policy_tx.signature = alice.sign(h.as_bytes());
+    state.validate_transaction(&policy_tx, 1_000_000).unwrap();
+    state.apply_transaction(&policy_tx).unwrap();
+
+    // Regular transfer of 1000 (above limit) should fail.
+    let fail_tx = sign_transfer(&alice, bob.address(), 1000, 1);
+    let result = state.validate_transaction(&fail_tx, 1_000_000);
+    assert!(result.is_err());
+
+    // Co-signed transfer of 1000 should succeed.
+    let mut co_tx = Transaction {
+        sender: alice.address(),
+        nonce: 1,
+        payload: TxPayload::CoSignedTransfer {
+            to: bob.address(),
+            amount: 1000,
+            memo: None,
+            co_signatures: vec![],
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let co_hash = co_tx.signable_hash();
+    co_tx.signature = alice.sign(co_hash.as_bytes());
+
+    // Add co-signer's signature.
+    let co_sig = cosigner.sign(co_hash.as_bytes());
+    if let TxPayload::CoSignedTransfer {
+        ref mut co_signatures,
+        ..
+    } = co_tx.payload
+    {
+        co_signatures.push((cosigner.address(), co_sig));
+    }
+
+    state.validate_transaction(&co_tx, 1_000_000).unwrap();
+    state.apply_transaction(&co_tx).unwrap();
+    assert_eq!(state.balance_of(&alice.address()), 9_000);
+    assert_eq!(state.balance_of(&bob.address()), 1_000);
+}
+
+// ─── Agent Pricing Tests ────────────────────────────────────────────────
+
+#[test]
+fn agent_pricing_update() {
+    let agent = KeyPair::generate();
+    let mut state = WorldState::new("baud-test".into());
+    state.accounts.insert(
+        agent.address(),
+        Account::with_balance(agent.address(), 1_000),
+    );
+
+    let mut tx = Transaction {
+        sender: agent.address(),
+        nonce: 0,
+        payload: TxPayload::UpdateAgentPricing {
+            price_per_request: 100,
+            billing_model: b"per-request".to_vec(),
+            sla_description: b"99.9% uptime".to_vec(),
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = tx.signable_hash();
+    tx.signature = agent.sign(h.as_bytes());
+
+    state.validate_transaction(&tx, 1_000_000).unwrap();
+    state.apply_transaction(&tx).unwrap();
+
+    let pricing = state.extended.agent_pricing.get(&agent.address()).unwrap();
+    assert_eq!(pricing.price_per_request, 100);
+    assert_eq!(pricing.billing_model, b"per-request");
+}
+
+// ─── Reputation Tests ───────────────────────────────────────────────────
+
+#[test]
+fn rate_agent_works() {
+    let rater = KeyPair::generate();
+    let agent = KeyPair::generate();
+    let mut state = WorldState::new("baud-test".into());
+    state.accounts.insert(
+        rater.address(),
+        Account::with_balance(rater.address(), 1_000),
+    );
+    state.accounts.insert(
+        agent.address(),
+        Account::with_balance(agent.address(), 1_000),
+    );
+
+    // Register the agent first.
+    let mut reg_tx = Transaction {
+        sender: agent.address(),
+        nonce: 0,
+        payload: TxPayload::AgentRegister {
+            name: b"test-agent".to_vec(),
+            endpoint: b"https://test.ai".to_vec(),
+            capabilities: vec![b"llm".to_vec()],
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = reg_tx.signable_hash();
+    reg_tx.signature = agent.sign(h.as_bytes());
+    state.apply_transaction(&reg_tx).unwrap();
+
+    // Rate the agent.
+    let mut rate_tx = Transaction {
+        sender: rater.address(),
+        nonce: 0,
+        payload: TxPayload::RateAgent {
+            target: agent.address(),
+            rating: 5,
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = rate_tx.signable_hash();
+    rate_tx.signature = rater.sign(h.as_bytes());
+
+    state.validate_transaction(&rate_tx, 1_000_000).unwrap();
+    state.apply_transaction(&rate_tx).unwrap();
+
+    let rep = state.extended.reputation.get(&agent.address()).unwrap();
+    assert_eq!(rep.total_score, 5);
+    assert_eq!(rep.rating_count, 1);
+    assert!((rep.average_score() - 5.0).abs() < f64::EPSILON);
+}
+
+// ─── Service Agreement Tests ────────────────────────────────────────────
+
+#[test]
+fn service_agreement_lifecycle() {
+    let client = KeyPair::generate();
+    let provider = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state.accounts.insert(
+        client.address(),
+        Account::with_balance(client.address(), 10_000),
+    );
+    state.accounts.insert(
+        provider.address(),
+        Account::with_balance(provider.address(), 1_000),
+    );
+
+    // Client creates agreement.
+    let mut create_tx = Transaction {
+        sender: client.address(),
+        nonce: 0,
+        payload: TxPayload::CreateServiceAgreement {
+            provider: provider.address(),
+            description: b"LLM inference service".to_vec(),
+            payment_amount: 5_000,
+            deadline: 5_000_000,
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = create_tx.signable_hash();
+    create_tx.signature = client.sign(h.as_bytes());
+
+    state.validate_transaction(&create_tx, 1_000_000).unwrap();
+    state.apply_transaction(&create_tx).unwrap();
+
+    // Client funds locked.
+    assert_eq!(state.balance_of(&client.address()), 5_000);
+
+    let agreement_id = create_tx.hash();
+
+    // Provider accepts.
+    let mut accept_tx = Transaction {
+        sender: provider.address(),
+        nonce: 0,
+        payload: TxPayload::AcceptServiceAgreement { agreement_id },
+        timestamp: 1_500_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = accept_tx.signable_hash();
+    accept_tx.signature = provider.sign(h.as_bytes());
+
+    state.validate_transaction(&accept_tx, 1_500_000).unwrap();
+    state.apply_transaction(&accept_tx).unwrap();
+
+    // Client marks complete.
+    let mut complete_tx = Transaction {
+        sender: client.address(),
+        nonce: 1,
+        payload: TxPayload::CompleteServiceAgreement { agreement_id },
+        timestamp: 2_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = complete_tx.signable_hash();
+    complete_tx.signature = client.sign(h.as_bytes());
+
+    state.validate_transaction(&complete_tx, 2_000_000).unwrap();
+    state.apply_transaction(&complete_tx).unwrap();
+
+    // Provider receives payment.
+    assert_eq!(state.balance_of(&provider.address()), 6_000);
+
+    // Provider gets reputation boost.
+    let rep = state.extended.reputation.get(&provider.address()).unwrap();
+    assert_eq!(rep.successful_jobs, 1);
+}
+
+// ─── Governance Tests ───────────────────────────────────────────────────
+
+#[test]
+fn governance_proposal_and_vote() {
+    let proposer = KeyPair::generate();
+    let voter = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state.accounts.insert(
+        proposer.address(),
+        Account::with_balance(proposer.address(), 10_000),
+    );
+    state.accounts.insert(
+        voter.address(),
+        Account::with_balance(voter.address(), 5_000),
+    );
+
+    // Create proposal.
+    let mut prop_tx = Transaction {
+        sender: proposer.address(),
+        nonce: 0,
+        payload: TxPayload::CreateProposal {
+            title: b"Increase block reward".to_vec(),
+            description: b"Proposal to double the block reward for validators".to_vec(),
+            voting_deadline: 10_000_000,
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = prop_tx.signable_hash();
+    prop_tx.signature = proposer.sign(h.as_bytes());
+
+    state.validate_transaction(&prop_tx, 1_000_000).unwrap();
+    state.apply_transaction(&prop_tx).unwrap();
+
+    let proposal_id = prop_tx.hash();
+    assert!(state.extended.proposals.contains_key(&proposal_id));
+
+    // Vote in favor.
+    let mut vote_tx = Transaction {
+        sender: voter.address(),
+        nonce: 0,
+        payload: TxPayload::CastVote {
+            proposal_id,
+            in_favor: true,
+        },
+        timestamp: 2_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = vote_tx.signable_hash();
+    vote_tx.signature = voter.sign(h.as_bytes());
+
+    state.validate_transaction(&vote_tx, 2_000_000).unwrap();
+    state.apply_transaction(&vote_tx).unwrap();
+
+    let proposal = state.extended.proposals.get(&proposal_id).unwrap();
+    assert_eq!(proposal.votes_for, 5_000); // Weighted by balance.
+    assert_eq!(proposal.votes_against, 0);
+
+    // Duplicate vote should fail.
+    let mut dup_vote = Transaction {
+        sender: voter.address(),
+        nonce: 1,
+        payload: TxPayload::CastVote {
+            proposal_id,
+            in_favor: false,
+        },
+        timestamp: 2_500_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = dup_vote.signable_hash();
+    dup_vote.signature = voter.sign(h.as_bytes());
+
+    let result = state.validate_transaction(&dup_vote, 2_500_000);
+    assert!(result.is_err());
+    assert!(format!("{}", result.unwrap_err()).contains("already voted"));
+}
+
+// ─── Recurring Payment Tests ────────────────────────────────────────────
+
+#[test]
+fn recurring_payment_create_and_cancel() {
+    let sender = KeyPair::generate();
+    let recipient = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state.accounts.insert(
+        sender.address(),
+        Account::with_balance(sender.address(), 10_000),
+    );
+
+    let mut create_tx = Transaction {
+        sender: sender.address(),
+        nonce: 0,
+        payload: TxPayload::CreateRecurringPayment {
+            recipient: recipient.address(),
+            amount_per_period: 100,
+            interval_ms: 3_600_000, // 1 hour
+            max_payments: 10,
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = create_tx.signable_hash();
+    create_tx.signature = sender.sign(h.as_bytes());
+
+    state.validate_transaction(&create_tx, 1_000_000).unwrap();
+    state.apply_transaction(&create_tx).unwrap();
+
+    let payment_id = create_tx.hash();
+    let payment = state.extended.recurring_payments.get(&payment_id).unwrap();
+    assert_eq!(payment.amount_per_period, 100);
+    assert_eq!(payment.max_payments, 10);
+
+    // Cancel it.
+    let mut cancel_tx = Transaction {
+        sender: sender.address(),
+        nonce: 1,
+        payload: TxPayload::CancelRecurringPayment { payment_id },
+        timestamp: 2_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = cancel_tx.signable_hash();
+    cancel_tx.signature = sender.sign(h.as_bytes());
+
+    state.validate_transaction(&cancel_tx, 2_000_000).unwrap();
+    state.apply_transaction(&cancel_tx).unwrap();
+
+    let payment = state.extended.recurring_payments.get(&payment_id).unwrap();
+    assert_eq!(
+        payment.status,
+        baud_core::types::RecurringPaymentStatus::Cancelled,
+    );
+}

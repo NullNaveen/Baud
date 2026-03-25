@@ -9,8 +9,10 @@ const MAX_ESCROWS_PER_ACCOUNT: usize = 1000;
 use crate::crypto::{verify_signature, Address, Hash};
 use crate::error::{BaudError, BaudResult};
 use crate::types::{
-    Account, AgentMeta, Amount, Escrow, EscrowStatus, MilestoneEscrow, MilestoneState,
-    SpendingPolicy, Transaction, TxPayload,
+    Account, AgentMeta, AgentPricing, AgreementStatus, Amount, Escrow, EscrowStatus,
+    ExtendedState, MilestoneEscrow, MilestoneState, Proposal, ProposalStatus, RecurringPayment,
+    RecurringPaymentStatus, Reputation, ServiceAgreement, SpendingPolicy, Transaction, TxPayload,
+    Vote,
 };
 
 // ─── World State ────────────────────────────────────────────────────────────
@@ -30,6 +32,9 @@ pub struct WorldState {
     pub last_block_hash: Hash,
     /// Chain ID for replay-protection across forks.
     pub chain_id: String,
+    /// Extended state for new features (stored separately, not in main serialization).
+    #[serde(skip)]
+    pub extended: ExtendedState,
 }
 
 impl WorldState {
@@ -41,6 +46,7 @@ impl WorldState {
             height: 0,
             last_block_hash: Hash::zero(),
             chain_id,
+            extended: ExtendedState::default(),
         }
     }
 
@@ -125,7 +131,22 @@ impl WorldState {
         }
 
         // 3. Signature verification
-        let signable = tx.signable_hash();
+        // For CoSignedTransfer, the sender signs the hash with empty
+        // co_signatures to avoid a circular dependency.
+        let signable = match &tx.payload {
+            TxPayload::CoSignedTransfer { .. } => {
+                let mut verify_tx = tx.clone();
+                if let TxPayload::CoSignedTransfer {
+                    ref mut co_signatures,
+                    ..
+                } = verify_tx.payload
+                {
+                    co_signatures.clear();
+                }
+                verify_tx.signable_hash()
+            }
+            _ => tx.signable_hash(),
+        };
         verify_signature(&tx.sender, signable.as_bytes(), &tx.signature)?;
 
         // 4. Nonce check
@@ -287,6 +308,191 @@ impl WorldState {
             }
             TxPayload::SetSpendingPolicy { .. } => {
                 // Sender is setting their own policy — no additional checks.
+            }
+            TxPayload::CoSignedTransfer {
+                amount,
+                co_signatures,
+                ..
+            } => {
+                if account.balance < *amount {
+                    return Err(BaudError::InsufficientBalance {
+                        have: account.balance,
+                        need: *amount,
+                    });
+                }
+                // Verify co-signer signatures against spending policy.
+                // Co-signers sign the hash computed with empty co_signatures
+                // to avoid circular dependency.
+                if let Some(ref policy) = account.spending_policy {
+                    if *amount > policy.auto_approve_limit && policy.required_co_signers > 0 {
+                        let mut verify_tx = tx.clone();
+                        if let TxPayload::CoSignedTransfer {
+                            co_signatures: ref mut sigs,
+                            ..
+                        } = verify_tx.payload
+                        {
+                            sigs.clear();
+                        }
+                        let co_sign_hash = verify_tx.signable_hash();
+
+                        let mut valid_co_signers = 0u32;
+                        for (co_addr, co_sig) in co_signatures {
+                            if !policy.co_signers.contains(co_addr) {
+                                return Err(BaudError::CoSignerValidationFailed(
+                                    format!("{} is not an authorized co-signer", co_addr),
+                                ));
+                            }
+                            verify_signature(co_addr, co_sign_hash.as_bytes(), co_sig)?;
+                            valid_co_signers += 1;
+                        }
+                        if valid_co_signers < policy.required_co_signers {
+                            return Err(BaudError::CoSignerValidationFailed(
+                                format!(
+                                    "need {} co-signers, got {}",
+                                    policy.required_co_signers, valid_co_signers
+                                ),
+                            ));
+                        }
+                    }
+                }
+            }
+            TxPayload::UpdateAgentPricing { .. } => {
+                // Sender updates their own pricing — no additional state checks.
+            }
+            TxPayload::RateAgent { target, .. } => {
+                // Target must exist as a registered agent.
+                let target_account = self.get_account(target);
+                if target_account.agent_meta.is_none() {
+                    return Err(BaudError::AccountNotFound(
+                        format!("target {} is not a registered agent", target),
+                    ));
+                }
+            }
+            TxPayload::CreateRecurringPayment {
+                amount_per_period, ..
+            } => {
+                // Sender must have at least one period's worth.
+                if account.balance < *amount_per_period {
+                    return Err(BaudError::InsufficientBalance {
+                        have: account.balance,
+                        need: *amount_per_period,
+                    });
+                }
+            }
+            TxPayload::CancelRecurringPayment { payment_id } => {
+                let payment = self
+                    .extended
+                    .recurring_payments
+                    .get(payment_id)
+                    .ok_or_else(|| {
+                        BaudError::RecurringPaymentNotFound(payment_id.to_hex())
+                    })?;
+                if payment.sender != tx.sender {
+                    return Err(BaudError::CoSignerValidationFailed(
+                        "only the sender can cancel a recurring payment".into(),
+                    ));
+                }
+                if payment.status != RecurringPaymentStatus::Active {
+                    return Err(BaudError::RecurringPaymentNotFound(
+                        "payment is not active".into(),
+                    ));
+                }
+            }
+            TxPayload::CreateServiceAgreement {
+                payment_amount, ..
+            } => {
+                if account.balance < *payment_amount {
+                    return Err(BaudError::InsufficientBalance {
+                        have: account.balance,
+                        need: *payment_amount,
+                    });
+                }
+            }
+            TxPayload::AcceptServiceAgreement { agreement_id } => {
+                let agreement = self
+                    .extended
+                    .service_agreements
+                    .get(agreement_id)
+                    .ok_or_else(|| {
+                        BaudError::AgreementNotFound(agreement_id.to_hex())
+                    })?;
+                if agreement.provider != tx.sender {
+                    return Err(BaudError::AgreementUnauthorized(
+                        "only the provider can accept".into(),
+                    ));
+                }
+                if agreement.status != AgreementStatus::Proposed {
+                    return Err(BaudError::InvalidAgreementStatus(
+                        format!("{:?}", agreement.status),
+                    ));
+                }
+            }
+            TxPayload::CompleteServiceAgreement { agreement_id } => {
+                let agreement = self
+                    .extended
+                    .service_agreements
+                    .get(agreement_id)
+                    .ok_or_else(|| {
+                        BaudError::AgreementNotFound(agreement_id.to_hex())
+                    })?;
+                // Client confirms completion.
+                if agreement.client != tx.sender {
+                    return Err(BaudError::AgreementUnauthorized(
+                        "only the client can mark as completed".into(),
+                    ));
+                }
+                if agreement.status != AgreementStatus::Accepted {
+                    return Err(BaudError::InvalidAgreementStatus(
+                        format!("{:?}", agreement.status),
+                    ));
+                }
+            }
+            TxPayload::DisputeServiceAgreement { agreement_id } => {
+                let agreement = self
+                    .extended
+                    .service_agreements
+                    .get(agreement_id)
+                    .ok_or_else(|| {
+                        BaudError::AgreementNotFound(agreement_id.to_hex())
+                    })?;
+                // Either party can dispute.
+                if agreement.client != tx.sender && agreement.provider != tx.sender {
+                    return Err(BaudError::AgreementUnauthorized(
+                        "only client or provider can dispute".into(),
+                    ));
+                }
+                if agreement.status != AgreementStatus::Accepted {
+                    return Err(BaudError::InvalidAgreementStatus(
+                        format!("{:?}", agreement.status),
+                    ));
+                }
+            }
+            TxPayload::CreateProposal { .. } => {
+                // Any account can create a proposal.
+            }
+            TxPayload::CastVote { proposal_id, .. } => {
+                let proposal = self
+                    .extended
+                    .proposals
+                    .get(proposal_id)
+                    .ok_or_else(|| {
+                        BaudError::ProposalNotFound(proposal_id.to_hex())
+                    })?;
+                // Check for duplicate votes BEFORE status check so the
+                // error is correct even if the proposal already resolved.
+                if let Some(votes) = self.extended.votes.get(proposal_id) {
+                    if votes.iter().any(|v| v.voter == tx.sender) {
+                        return Err(BaudError::AlreadyVoted);
+                    }
+                }
+                if proposal.status != ProposalStatus::Active {
+                    return Err(BaudError::ProposalNotFound(
+                        "proposal is not active".into(),
+                    ));
+                }
+                if current_time > proposal.voting_deadline {
+                    return Err(BaudError::VotingPeriodEnded);
+                }
             }
         }
 
@@ -551,6 +757,263 @@ impl WorldState {
                     required_co_signers: *required_co_signers,
                 });
                 debug!(address = %sender_addr, limit = %auto_approve_limit, "spending policy set");
+            }
+
+            TxPayload::CoSignedTransfer {
+                to, amount, ..
+            } => {
+                // Same as Transfer but co-signatures already validated.
+                {
+                    let sender = self
+                        .accounts
+                        .get_mut(&sender_addr)
+                        .ok_or_else(|| BaudError::AccountNotFound(sender_addr.to_hex()))?;
+                    sender.balance = sender.balance.checked_sub(*amount).ok_or(
+                        BaudError::InsufficientBalance {
+                            have: sender.balance,
+                            need: *amount,
+                        },
+                    )?;
+                }
+                {
+                    let recipient = self
+                        .accounts
+                        .entry(*to)
+                        .or_insert_with(|| Account::new(*to));
+                    recipient.balance = recipient
+                        .balance
+                        .checked_add(*amount)
+                        .ok_or(BaudError::Overflow)?;
+                }
+                debug!(
+                    from = %sender_addr,
+                    to = %to,
+                    amount = %amount,
+                    "co-signed transfer applied"
+                );
+            }
+
+            TxPayload::UpdateAgentPricing {
+                price_per_request,
+                billing_model,
+                sla_description,
+            } => {
+                self.extended.agent_pricing.insert(
+                    sender_addr,
+                    AgentPricing {
+                        price_per_request: *price_per_request,
+                        billing_model: billing_model.clone(),
+                        sla_description: sla_description.clone(),
+                    },
+                );
+                debug!(address = %sender_addr, price = %price_per_request, "agent pricing updated");
+            }
+
+            TxPayload::RateAgent { target, rating } => {
+                let rep = self
+                    .extended
+                    .reputation
+                    .entry(*target)
+                    .or_insert_with(Reputation::new);
+                rep.total_score = rep.total_score.saturating_add(*rating as u64);
+                rep.rating_count = rep.rating_count.saturating_add(1);
+                debug!(target = %target, rating = rating, avg = %rep.average_score(), "agent rated");
+            }
+
+            TxPayload::CreateRecurringPayment {
+                recipient,
+                amount_per_period,
+                interval_ms,
+                max_payments,
+            } => {
+                let payment_id = tx.hash();
+                let payment = RecurringPayment {
+                    id: payment_id,
+                    sender: sender_addr,
+                    recipient: *recipient,
+                    amount_per_period: *amount_per_period,
+                    interval_ms: *interval_ms,
+                    last_executed: tx.timestamp,
+                    max_payments: *max_payments,
+                    payments_made: 0,
+                    status: RecurringPaymentStatus::Active,
+                    created_at_height: self.height,
+                };
+                self.extended.recurring_payments.insert(payment_id, payment);
+                debug!(id = %payment_id, amount = %amount_per_period, "recurring payment created");
+            }
+
+            TxPayload::CancelRecurringPayment { payment_id } => {
+                if let Some(payment) = self.extended.recurring_payments.get_mut(payment_id) {
+                    payment.status = RecurringPaymentStatus::Cancelled;
+                }
+                debug!(id = %payment_id, "recurring payment cancelled");
+            }
+
+            TxPayload::CreateServiceAgreement {
+                provider,
+                description,
+                payment_amount,
+                deadline,
+            } => {
+                // Lock funds from client.
+                {
+                    let sender = self
+                        .accounts
+                        .get_mut(&sender_addr)
+                        .ok_or_else(|| BaudError::AccountNotFound(sender_addr.to_hex()))?;
+                    sender.balance = sender.balance.checked_sub(*payment_amount).ok_or(
+                        BaudError::InsufficientBalance {
+                            have: sender.balance,
+                            need: *payment_amount,
+                        },
+                    )?;
+                }
+                let agreement_id = tx.hash();
+                let agreement = ServiceAgreement {
+                    id: agreement_id,
+                    client: sender_addr,
+                    provider: *provider,
+                    description: description.clone(),
+                    payment_amount: *payment_amount,
+                    deadline: *deadline,
+                    status: AgreementStatus::Proposed,
+                    created_at_height: self.height,
+                };
+                self.extended
+                    .service_agreements
+                    .insert(agreement_id, agreement);
+                debug!(id = %agreement_id, amount = %payment_amount, "service agreement created");
+            }
+
+            TxPayload::AcceptServiceAgreement { agreement_id } => {
+                if let Some(agreement) = self.extended.service_agreements.get_mut(agreement_id) {
+                    agreement.status = AgreementStatus::Accepted;
+                }
+                debug!(id = %agreement_id, "service agreement accepted");
+            }
+
+            TxPayload::CompleteServiceAgreement { agreement_id } => {
+                let agreement = self
+                    .extended
+                    .service_agreements
+                    .get_mut(agreement_id)
+                    .ok_or_else(|| BaudError::AgreementNotFound(agreement_id.to_hex()))?;
+                agreement.status = AgreementStatus::Completed;
+                let provider = agreement.provider;
+                let amount = agreement.payment_amount;
+
+                // Release payment to provider.
+                let acc = self
+                    .accounts
+                    .entry(provider)
+                    .or_insert_with(|| Account::new(provider));
+                acc.balance = acc.balance.checked_add(amount).ok_or(BaudError::Overflow)?;
+
+                // Update reputation: successful job for provider.
+                let rep = self
+                    .extended
+                    .reputation
+                    .entry(provider)
+                    .or_insert_with(Reputation::new);
+                rep.successful_jobs = rep.successful_jobs.saturating_add(1);
+                debug!(id = %agreement_id, "service agreement completed, payment released");
+            }
+
+            TxPayload::DisputeServiceAgreement { agreement_id } => {
+                let agreement = self
+                    .extended
+                    .service_agreements
+                    .get_mut(agreement_id)
+                    .ok_or_else(|| BaudError::AgreementNotFound(agreement_id.to_hex()))?;
+                agreement.status = AgreementStatus::Disputed;
+                let client = agreement.client;
+                let provider = agreement.provider;
+                let amount = agreement.payment_amount;
+
+                // Refund full amount to client on dispute (simple v1 resolution).
+                let acc = self
+                    .accounts
+                    .entry(client)
+                    .or_insert_with(|| Account::new(client));
+                acc.balance = acc.balance.checked_add(amount).ok_or(BaudError::Overflow)?;
+
+                // Update reputation: failed job for provider.
+                let rep = self
+                    .extended
+                    .reputation
+                    .entry(provider)
+                    .or_insert_with(Reputation::new);
+                rep.failed_jobs = rep.failed_jobs.saturating_add(1);
+                debug!(id = %agreement_id, "service agreement disputed, payment refunded");
+            }
+
+            TxPayload::CreateProposal {
+                title,
+                description,
+                voting_deadline,
+            } => {
+                let proposal_id = tx.hash();
+                // Quorum = 10% of total accounts (minimum 1).
+                let quorum = std::cmp::max(1, self.accounts.len() / 10) as u128;
+                let proposal = Proposal {
+                    id: proposal_id,
+                    proposer: sender_addr,
+                    title: title.clone(),
+                    description: description.clone(),
+                    voting_deadline: *voting_deadline,
+                    votes_for: 0,
+                    votes_against: 0,
+                    quorum,
+                    status: ProposalStatus::Active,
+                    created_at_height: self.height,
+                };
+                self.extended.proposals.insert(proposal_id, proposal);
+                debug!(id = %proposal_id, "governance proposal created");
+            }
+
+            TxPayload::CastVote {
+                proposal_id,
+                in_favor,
+            } => {
+                let voter_balance = self.balance_of(&sender_addr);
+                let vote = Vote {
+                    voter: sender_addr,
+                    proposal_id: *proposal_id,
+                    in_favor: *in_favor,
+                    weight: voter_balance,
+                };
+                // Update proposal tallies.
+                if let Some(proposal) = self.extended.proposals.get_mut(proposal_id) {
+                    if *in_favor {
+                        proposal.votes_for = proposal
+                            .votes_for
+                            .checked_add(voter_balance)
+                            .ok_or(BaudError::Overflow)?;
+                    } else {
+                        proposal.votes_against = proposal
+                            .votes_against
+                            .checked_add(voter_balance)
+                            .ok_or(BaudError::Overflow)?;
+                    }
+                    // Check if quorum reached and resolve.
+                    let total_votes = proposal
+                        .votes_for
+                        .saturating_add(proposal.votes_against);
+                    if total_votes >= proposal.quorum {
+                        if proposal.votes_for > proposal.votes_against {
+                            proposal.status = ProposalStatus::Passed;
+                        } else {
+                            proposal.status = ProposalStatus::Rejected;
+                        }
+                    }
+                }
+                self.extended
+                    .votes
+                    .entry(*proposal_id)
+                    .or_default()
+                    .push(vote);
+                debug!(proposal = %proposal_id, in_favor = in_favor, "vote cast");
             }
         }
 

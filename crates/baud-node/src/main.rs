@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use parking_lot::RwLock;
 use tokio::sync::broadcast;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 use baud_api::routes::{build_router, AppState};
@@ -101,6 +101,17 @@ async fn main() -> Result<()> {
             s
         }
     };
+
+    // Load extended state (new features) separately.
+    let extended = store
+        .load_extended_state()
+        .unwrap_or_else(|e| {
+            warn!("failed to load extended state: {e}, using defaults");
+            baud_core::types::ExtendedState::default()
+        });
+
+    let mut state = state;
+    state.extended = extended;
     let state = Arc::new(RwLock::new(state));
 
     // ── Initialize mempool ──────────────────────────────────────────────
@@ -216,6 +227,9 @@ async fn main() -> Result<()> {
             if let Err(e) = persist_store.save_state(&ws) {
                 tracing::error!(error = %e, "failed to persist state");
             }
+            if let Err(e) = persist_store.save_extended_state(&ws.extended) {
+                tracing::error!(error = %e, "failed to persist extended state");
+            }
         }
     });
 
@@ -245,6 +259,9 @@ async fn main() -> Result<()> {
             tracing::error!(error = %e, "failed to persist state on shutdown");
         } else {
             info!(height = ws.height, "state persisted on shutdown");
+        }
+        if let Err(e) = store.save_extended_state(&ws.extended) {
+            tracing::error!(error = %e, "failed to persist extended state on shutdown");
         }
     }
 

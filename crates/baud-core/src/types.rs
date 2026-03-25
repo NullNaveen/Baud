@@ -154,6 +154,81 @@ pub enum TxPayload {
         /// Number of co-signers required for high-value transactions (0 = disabled).
         required_co_signers: u32,
     },
+    /// Transfer that includes co-signer approvals (for amounts above auto_approve_limit).
+    CoSignedTransfer {
+        to: Address,
+        amount: Amount,
+        memo: Option<Vec<u8>>,
+        /// Co-signer signatures over the signable_hash of this transaction.
+        co_signatures: Vec<(Address, Signature)>,
+    },
+    /// Update agent pricing information.
+    UpdateAgentPricing {
+        /// Price per request in quanta.
+        price_per_request: Amount,
+        /// Billing model (max 32 bytes, e.g. "per-request").
+        billing_model: Vec<u8>,
+        /// Optional SLA description (max 256 bytes).
+        sla_description: Vec<u8>,
+    },
+    /// Rate another agent (requires prior interaction via escrow/agreement).
+    RateAgent {
+        /// The agent being rated.
+        target: Address,
+        /// Rating score (1-5).
+        rating: u8,
+    },
+    /// Create a recurring payment schedule.
+    CreateRecurringPayment {
+        recipient: Address,
+        /// Amount per period in quanta.
+        amount_per_period: Amount,
+        /// Interval between payments in milliseconds.
+        interval_ms: u64,
+        /// Maximum number of payments (0 = unlimited).
+        max_payments: u32,
+    },
+    /// Cancel a recurring payment.
+    CancelRecurringPayment {
+        payment_id: Hash,
+    },
+    /// Propose a service agreement to another agent.
+    CreateServiceAgreement {
+        provider: Address,
+        /// Description of the service (max 512 bytes).
+        description: Vec<u8>,
+        /// Total payment amount in quanta.
+        payment_amount: Amount,
+        /// Deadline for completion (Unix ms).
+        deadline: u64,
+    },
+    /// Accept a proposed service agreement (locks payment in escrow).
+    AcceptServiceAgreement {
+        agreement_id: Hash,
+    },
+    /// Mark a service agreement as completed (releases payment).
+    CompleteServiceAgreement {
+        agreement_id: Hash,
+    },
+    /// Dispute a service agreement.
+    DisputeServiceAgreement {
+        agreement_id: Hash,
+    },
+    /// Create a governance proposal.
+    CreateProposal {
+        /// Title (max 128 bytes).
+        title: Vec<u8>,
+        /// Description (max 1024 bytes).
+        description: Vec<u8>,
+        /// Voting deadline (Unix ms).
+        voting_deadline: u64,
+    },
+    /// Cast a vote on a governance proposal.
+    CastVote {
+        proposal_id: Hash,
+        /// True = for, false = against.
+        in_favor: bool,
+    },
 }
 
 /// Maximum serialized transaction size (64 KiB).
@@ -172,6 +247,8 @@ pub const MAX_CAPABILITY_LEN: usize = 64;
 pub const MAX_MILESTONES: usize = 32;
 /// Maximum co-signers per spending policy.
 pub const MAX_CO_SIGNERS: usize = 8;
+/// Maximum co-signatures in a CoSignedTransfer.
+pub const MAX_CO_SIGNATURES: usize = 8;
 
 /// A single milestone in a milestone-based escrow.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -339,6 +416,134 @@ impl Transaction {
                     });
                 }
             }
+            TxPayload::CoSignedTransfer {
+                to,
+                amount,
+                memo,
+                co_signatures,
+            } => {
+                if self.sender == *to {
+                    return Err(BaudError::SelfTransfer);
+                }
+                if *amount == 0 {
+                    return Err(BaudError::ZeroAmount);
+                }
+                if let Some(m) = memo {
+                    if m.len() > MAX_MEMO_LEN {
+                        return Err(BaudError::TransactionTooLarge {
+                            size: m.len(),
+                            max: MAX_MEMO_LEN,
+                        });
+                    }
+                }
+                if co_signatures.len() > MAX_CO_SIGNATURES {
+                    return Err(BaudError::TransactionTooLarge {
+                        size: co_signatures.len(),
+                        max: MAX_CO_SIGNATURES,
+                    });
+                }
+            }
+            TxPayload::UpdateAgentPricing {
+                billing_model,
+                sla_description,
+                ..
+            } => {
+                if billing_model.len() > MAX_BILLING_MODEL_LEN {
+                    return Err(BaudError::TransactionTooLarge {
+                        size: billing_model.len(),
+                        max: MAX_BILLING_MODEL_LEN,
+                    });
+                }
+                if sla_description.len() > MAX_SLA_DESCRIPTION_LEN {
+                    return Err(BaudError::TransactionTooLarge {
+                        size: sla_description.len(),
+                        max: MAX_SLA_DESCRIPTION_LEN,
+                    });
+                }
+            }
+            TxPayload::RateAgent { rating, target } => {
+                if *rating < MIN_RATING || *rating > MAX_RATING {
+                    return Err(BaudError::InvalidRating {
+                        value: *rating,
+                        min: MIN_RATING,
+                        max: MAX_RATING,
+                    });
+                }
+                if self.sender == *target {
+                    return Err(BaudError::SelfTransfer);
+                }
+            }
+            TxPayload::CreateRecurringPayment {
+                recipient,
+                amount_per_period,
+                interval_ms,
+                ..
+            } => {
+                if self.sender == *recipient {
+                    return Err(BaudError::SelfTransfer);
+                }
+                if *amount_per_period == 0 {
+                    return Err(BaudError::ZeroAmount);
+                }
+                if *interval_ms < MIN_RECURRING_INTERVAL || *interval_ms > MAX_RECURRING_INTERVAL {
+                    return Err(BaudError::InvalidRecurringInterval {
+                        interval: *interval_ms,
+                    });
+                }
+            }
+            TxPayload::CancelRecurringPayment { .. } => {}
+            TxPayload::CreateServiceAgreement {
+                provider,
+                description,
+                payment_amount,
+                deadline,
+            } => {
+                if self.sender == *provider {
+                    return Err(BaudError::SelfTransfer);
+                }
+                if *payment_amount == 0 {
+                    return Err(BaudError::ZeroAmount);
+                }
+                if description.len() > MAX_AGREEMENT_DESCRIPTION_LEN {
+                    return Err(BaudError::TransactionTooLarge {
+                        size: description.len(),
+                        max: MAX_AGREEMENT_DESCRIPTION_LEN,
+                    });
+                }
+                if *deadline <= self.timestamp {
+                    return Err(BaudError::EscrowDeadlineExceeded {
+                        current: self.timestamp,
+                        deadline: *deadline,
+                    });
+                }
+            }
+            TxPayload::AcceptServiceAgreement { .. } => {}
+            TxPayload::CompleteServiceAgreement { .. } => {}
+            TxPayload::DisputeServiceAgreement { .. } => {}
+            TxPayload::CreateProposal {
+                title,
+                description,
+                voting_deadline,
+            } => {
+                if title.len() > MAX_PROPOSAL_TITLE_LEN {
+                    return Err(BaudError::TransactionTooLarge {
+                        size: title.len(),
+                        max: MAX_PROPOSAL_TITLE_LEN,
+                    });
+                }
+                if description.len() > MAX_PROPOSAL_DESCRIPTION_LEN {
+                    return Err(BaudError::TransactionTooLarge {
+                        size: description.len(),
+                        max: MAX_PROPOSAL_DESCRIPTION_LEN,
+                    });
+                }
+                if *voting_deadline <= self.timestamp + MIN_VOTING_PERIOD {
+                    return Err(BaudError::VotingPeriodTooShort {
+                        minimum_ms: MIN_VOTING_PERIOD,
+                    });
+                }
+            }
+            TxPayload::CastVote { .. } => {}
         }
         Ok(())
     }
@@ -431,6 +636,205 @@ pub struct AgentMeta {
     pub name: Vec<u8>,
     pub endpoint: Vec<u8>,
     pub capabilities: Vec<Vec<u8>>,
+}
+
+// ─── Agent Pricing ──────────────────────────────────────────────────────────
+
+/// Pricing model for agent services (stored in ExtendedState).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentPricing {
+    /// Price per request in quanta.
+    pub price_per_request: Amount,
+    /// Billing model: "per-request", "per-second", "flat-rate".
+    pub billing_model: Vec<u8>,
+    /// Optional SLA description (max 256 bytes).
+    pub sla_description: Vec<u8>,
+}
+
+/// Maximum SLA description length.
+pub const MAX_SLA_DESCRIPTION_LEN: usize = 256;
+/// Maximum billing model length.
+pub const MAX_BILLING_MODEL_LEN: usize = 32;
+
+// ─── Reputation ─────────────────────────────────────────────────────────────
+
+/// Reputation score for an agent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Reputation {
+    /// Cumulative score (sum of all ratings).
+    pub total_score: u64,
+    /// Number of ratings received.
+    pub rating_count: u64,
+    /// Number of successful jobs.
+    pub successful_jobs: u64,
+    /// Number of failed/disputed jobs.
+    pub failed_jobs: u64,
+}
+
+impl Reputation {
+    pub fn new() -> Self {
+        Self {
+            total_score: 0,
+            rating_count: 0,
+            successful_jobs: 0,
+            failed_jobs: 0,
+        }
+    }
+
+    /// Average score (1-5 scale, 0 if no ratings).
+    pub fn average_score(&self) -> f64 {
+        if self.rating_count == 0 {
+            0.0
+        } else {
+            self.total_score as f64 / self.rating_count as f64
+        }
+    }
+}
+
+impl Default for Reputation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Maximum rating value (1-5 scale).
+pub const MAX_RATING: u8 = 5;
+/// Minimum rating value.
+pub const MIN_RATING: u8 = 1;
+
+// ─── Recurring Payments ─────────────────────────────────────────────────────
+
+/// A recurring payment schedule between two agents.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RecurringPaymentStatus {
+    Active,
+    Cancelled,
+    Completed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecurringPayment {
+    pub id: Hash,
+    pub sender: Address,
+    pub recipient: Address,
+    /// Amount per payment in quanta.
+    pub amount_per_period: Amount,
+    /// Interval between payments in milliseconds.
+    pub interval_ms: u64,
+    /// Unix-ms timestamp of last payment execution.
+    pub last_executed: u64,
+    /// Maximum number of payments (0 = unlimited).
+    pub max_payments: u32,
+    /// Number of payments executed so far.
+    pub payments_made: u32,
+    pub status: RecurringPaymentStatus,
+    pub created_at_height: u64,
+}
+
+/// Maximum interval for recurring payments (1 year in ms).
+pub const MAX_RECURRING_INTERVAL: u64 = 365 * 24 * 60 * 60 * 1000;
+/// Minimum interval for recurring payments (1 minute in ms).
+pub const MIN_RECURRING_INTERVAL: u64 = 60_000;
+
+// ─── Service Agreements ─────────────────────────────────────────────────────
+
+/// Status of a service agreement.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AgreementStatus {
+    Proposed,
+    Accepted,
+    Completed,
+    Disputed,
+    Cancelled,
+}
+
+/// A bilateral service agreement between two agents.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceAgreement {
+    pub id: Hash,
+    pub client: Address,
+    pub provider: Address,
+    /// Description of the service (max 512 bytes).
+    pub description: Vec<u8>,
+    /// Total payment amount in quanta (locked in escrow on acceptance).
+    pub payment_amount: Amount,
+    /// Deadline for service completion (Unix ms).
+    pub deadline: u64,
+    pub status: AgreementStatus,
+    pub created_at_height: u64,
+}
+
+/// Maximum service agreement description length.
+pub const MAX_AGREEMENT_DESCRIPTION_LEN: usize = 512;
+
+// ─── Governance ─────────────────────────────────────────────────────────────
+
+/// Status of a governance proposal.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ProposalStatus {
+    Active,
+    Passed,
+    Rejected,
+    Executed,
+}
+
+/// A governance proposal that token holders can vote on.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Proposal {
+    pub id: Hash,
+    pub proposer: Address,
+    /// Title (max 128 bytes).
+    pub title: Vec<u8>,
+    /// Description (max 1024 bytes).
+    pub description: Vec<u8>,
+    /// Voting deadline (Unix ms).
+    pub voting_deadline: u64,
+    /// Total votes for.
+    pub votes_for: Amount,
+    /// Total votes against.
+    pub votes_against: Amount,
+    /// Minimum quorum required (total votes / total supply).
+    pub quorum: Amount,
+    pub status: ProposalStatus,
+    pub created_at_height: u64,
+}
+
+/// A single vote cast by a token holder.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Vote {
+    pub voter: Address,
+    pub proposal_id: Hash,
+    /// True = for, false = against.
+    pub in_favor: bool,
+    /// Weight = voter's balance at time of voting.
+    pub weight: Amount,
+}
+
+/// Maximum proposal title length.
+pub const MAX_PROPOSAL_TITLE_LEN: usize = 128;
+/// Maximum proposal description length.
+pub const MAX_PROPOSAL_DESCRIPTION_LEN: usize = 1024;
+/// Minimum voting period (1 hour in ms).
+pub const MIN_VOTING_PERIOD: u64 = 3_600_000;
+
+// ─── Extended State ─────────────────────────────────────────────────────────
+
+/// Extended state for new features (stored separately from WorldState to
+/// maintain backward compatibility with existing serialized chain data).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExtendedState {
+    /// Agent pricing indexed by address.
+    pub agent_pricing: std::collections::HashMap<Address, AgentPricing>,
+    /// Reputation scores indexed by address.
+    pub reputation: std::collections::HashMap<Address, Reputation>,
+    /// Recurring payments indexed by ID.
+    pub recurring_payments: std::collections::HashMap<Hash, RecurringPayment>,
+    /// Service agreements indexed by ID.
+    pub service_agreements: std::collections::HashMap<Hash, ServiceAgreement>,
+    /// Governance proposals indexed by ID.
+    pub proposals: std::collections::HashMap<Hash, Proposal>,
+    /// Votes per proposal: proposal_id → list of votes.
+    pub votes: std::collections::HashMap<Hash, Vec<Vote>>,
 }
 
 impl Account {

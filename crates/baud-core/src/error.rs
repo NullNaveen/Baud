@@ -75,6 +75,39 @@ pub enum BaudError {
     #[error("invalid spending policy: required_co_signers ({required}) exceeds co_signers count ({available})")]
     InvalidSpendingPolicy { required: u32, available: usize },
 
+    #[error("co-signer validation failed: {0}")]
+    CoSignerValidationFailed(String),
+
+    #[error("invalid rating: {value} (must be {min}-{max})")]
+    InvalidRating { value: u8, min: u8, max: u8 },
+
+    #[error("invalid recurring payment interval: {interval}ms")]
+    InvalidRecurringInterval { interval: u64 },
+
+    #[error("recurring payment not found: {0}")]
+    RecurringPaymentNotFound(String),
+
+    #[error("service agreement not found: {0}")]
+    AgreementNotFound(String),
+
+    #[error("unauthorized agreement operation: {0}")]
+    AgreementUnauthorized(String),
+
+    #[error("invalid agreement status for this operation: {0}")]
+    InvalidAgreementStatus(String),
+
+    #[error("proposal not found: {0}")]
+    ProposalNotFound(String),
+
+    #[error("voting period too short (minimum: {minimum_ms}ms)")]
+    VotingPeriodTooShort { minimum_ms: u64 },
+
+    #[error("voting period has ended")]
+    VotingPeriodEnded,
+
+    #[error("already voted on this proposal")]
+    AlreadyVoted,
+
     #[error("nonce gap too large: current nonce {current}, got {got}, max gap {max_gap}")]
     NonceGapTooLarge {
         current: u64,
