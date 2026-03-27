@@ -24,6 +24,9 @@ from baud_sdk.signing import (
     sign_escrow_release,
     sign_escrow_refund,
     sign_agent_register,
+    sign_batch_transfer,
+    sign_create_sub_account,
+    sign_delegated_transfer,
 )
 
 
@@ -292,6 +295,46 @@ class BaudClient:
         if nonce is None:
             nonce = self.nonce(nkp.address_hex)
         tx = sign_agent_register(nkp, name, endpoint, capabilities, nonce, self.chain_id)
+        return self.submit_raw(tx)
+
+    def native_batch_transfer(
+        self,
+        transfers: list[tuple[str, int]],
+        nonce: Optional[int] = None,
+    ) -> dict:
+        """Sign and submit a batch transfer (atomic, up to 32 recipients)."""
+        nkp = self._require_native_keypair()
+        if nonce is None:
+            nonce = self.nonce(nkp.address_hex)
+        tx = sign_batch_transfer(nkp, transfers, nonce, self.chain_id)
+        return self.submit_raw(tx)
+
+    def native_create_sub_account(
+        self,
+        label: str,
+        budget: int,
+        expiry: int = 0,
+        nonce: Optional[int] = None,
+    ) -> dict:
+        """Create a sub-account with a delegated budget."""
+        nkp = self._require_native_keypair()
+        if nonce is None:
+            nonce = self.nonce(nkp.address_hex)
+        tx = sign_create_sub_account(nkp, label, budget, expiry, nonce, self.chain_id)
+        return self.submit_raw(tx)
+
+    def native_delegated_transfer(
+        self,
+        sub_account_id: str,
+        to: str,
+        amount: int,
+        nonce: Optional[int] = None,
+    ) -> dict:
+        """Transfer from a sub-account's delegated budget."""
+        nkp = self._require_native_keypair()
+        if nonce is None:
+            nonce = self.nonce(nkp.address_hex)
+        tx = sign_delegated_transfer(nkp, sub_account_id, to, amount, nonce, self.chain_id)
         return self.submit_raw(tx)
 
     @property

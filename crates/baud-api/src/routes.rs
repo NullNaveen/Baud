@@ -25,7 +25,7 @@ use axum::response::Html;
 use baud_core::crypto::{Address, Hash, KeyPair, Signature};
 use baud_core::mempool::Mempool;
 use baud_core::state::WorldState;
-use baud_core::types::{EscrowStatus, Transaction, TxPayload, RecurringPaymentStatus, AgreementStatus, ProposalStatus};
+use baud_core::types::{EscrowStatus, Transaction, TxPayload, AgreementStatus, ProposalStatus};
 
 static DASHBOARD_HTML: &str = include_str!("../dashboard.html");
 
@@ -133,6 +133,33 @@ pub enum TxPayloadDto {
         proposal_id: String,
         in_favor: bool,
     },
+    CreateSubAccount {
+        label: String,
+        budget: u128,
+        expiry: u64,
+    },
+    DelegatedTransfer {
+        sub_account_id: String,
+        to: String,
+        amount: u128,
+    },
+    SetArbitrator {
+        agreement_id: String,
+        arbitrator: String,
+    },
+    ArbitrateDispute {
+        agreement_id: String,
+        provider_amount: u128,
+    },
+    BatchTransfer {
+        transfers: Vec<BatchEntryDto>,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchEntryDto {
+    pub to: String,
+    pub amount: u128,
 }
 
 #[derive(Debug, Serialize)]
@@ -318,6 +345,7 @@ pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Ro
         .route("/v1/pricing/:address", get(get_pricing))
         .route("/v1/proposal/:id", get(get_proposal))
         .route("/v1/agreement/:id", get(get_agreement))
+        .route("/v1/sub-account/:id", get(get_sub_account))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
         .layer(middleware::from_fn_with_state(
             limiter,
@@ -1241,6 +1269,102 @@ fn parse_tx_request(
                 in_favor,
             }
         }
+        TxPayloadDto::CreateSubAccount {
+            label,
+            budget,
+            expiry,
+        } => TxPayload::CreateSubAccount {
+            label: label.into_bytes(),
+            budget,
+            expiry,
+        },
+        TxPayloadDto::DelegatedTransfer {
+            sub_account_id,
+            to,
+            amount,
+        } => {
+            let sid = Hash::from_hex(&sub_account_id).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid sub_account_id: {e}"),
+                    }),
+                )
+            })?;
+            let to_addr = Address::from_hex(&to).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid recipient address: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::DelegatedTransfer {
+                sub_account_id: sid,
+                to: to_addr,
+                amount,
+            }
+        }
+        TxPayloadDto::SetArbitrator {
+            agreement_id,
+            arbitrator,
+        } => {
+            let aid = Hash::from_hex(&agreement_id).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid agreement_id: {e}"),
+                    }),
+                )
+            })?;
+            let arb = Address::from_hex(&arbitrator).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid arbitrator address: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::SetArbitrator {
+                agreement_id: aid,
+                arbitrator: arb,
+            }
+        }
+        TxPayloadDto::ArbitrateDispute {
+            agreement_id,
+            provider_amount,
+        } => {
+            let aid = Hash::from_hex(&agreement_id).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse {
+                        error: format!("invalid agreement_id: {e}"),
+                    }),
+                )
+            })?;
+            TxPayload::ArbitrateDispute {
+                agreement_id: aid,
+                provider_amount,
+            }
+        }
+        TxPayloadDto::BatchTransfer { transfers } => {
+            let mut entries = Vec::with_capacity(transfers.len());
+            for t in transfers {
+                let to_addr = Address::from_hex(&t.to).map_err(|e| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(ErrorResponse {
+                            error: format!("invalid recipient address: {e}"),
+                        }),
+                    )
+                })?;
+                entries.push(baud_core::types::BatchEntry {
+                    to: to_addr,
+                    amount: t.amount,
+                });
+            }
+            TxPayload::BatchTransfer { transfers: entries }
+        }
     };
 
     Ok(Transaction {
@@ -1413,6 +1537,43 @@ async fn get_agreement(
         None => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "agreement not found"})),
+        )
+            .into_response(),
+    }
+}
+
+async fn get_sub_account(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let sid = match Hash::from_hex(&id) {
+        Ok(h) => h,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("invalid sub-account id: {e}")})),
+            )
+                .into_response()
+        }
+    };
+    let ws = state.world_state.read();
+    match ws.extended.sub_accounts.get(&sid) {
+        Some(s) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "id": sid.to_hex(),
+                "owner": s.owner.to_hex(),
+                "label": String::from_utf8_lossy(&s.label),
+                "budget": s.budget.to_string(),
+                "spent": s.spent.to_string(),
+                "remaining": s.budget.saturating_sub(s.spent).to_string(),
+                "expiry": s.expiry,
+            })),
+        )
+            .into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "sub-account not found"})),
         )
             .into_response(),
     }

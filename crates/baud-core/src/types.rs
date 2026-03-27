@@ -229,6 +229,43 @@ pub enum TxPayload {
         /// True = for, false = against.
         in_favor: bool,
     },
+    /// Create a sub-account with a delegated budget.
+    CreateSubAccount {
+        /// Label for the sub-account (max 64 bytes).
+        label: Vec<u8>,
+        /// Maximum spend budget in quanta.
+        budget: Amount,
+        /// Optional expiry (Unix ms, 0 = no expiry).
+        expiry: u64,
+    },
+    /// Transfer from a sub-account's delegated budget.
+    DelegatedTransfer {
+        /// Sub-account ID (hash of creation tx).
+        sub_account_id: Hash,
+        /// Recipient address.
+        to: Address,
+        /// Amount in quanta.
+        amount: Amount,
+    },
+    /// Set an arbitrator for a disputed service agreement.
+    SetArbitrator {
+        /// The agreement to assign an arbitrator for.
+        agreement_id: Hash,
+        /// The address of the trusted third-party arbitrator.
+        arbitrator: Address,
+    },
+    /// Arbitrator resolves a disputed agreement (splits payment).
+    ArbitrateDispute {
+        /// The disputed agreement.
+        agreement_id: Hash,
+        /// Amount (in quanta) to pay the provider; remainder refunded to client.
+        provider_amount: Amount,
+    },
+    /// Submit a batch of transactions for atomic execution.
+    BatchTransfer {
+        /// Individual transfers within the batch (max 32).
+        transfers: Vec<BatchEntry>,
+    },
 }
 
 /// Maximum serialized transaction size (64 KiB).
@@ -249,6 +286,19 @@ pub const MAX_MILESTONES: usize = 32;
 pub const MAX_CO_SIGNERS: usize = 8;
 /// Maximum co-signatures in a CoSignedTransfer.
 pub const MAX_CO_SIGNATURES: usize = 8;
+/// Maximum sub-account label length.
+pub const MAX_SUB_ACCOUNT_LABEL_LEN: usize = 64;
+/// Maximum entries in a BatchTransfer.
+pub const MAX_BATCH_ENTRIES: usize = 32;
+
+/// A single entry in a batch transfer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchEntry {
+    /// Recipient address.
+    pub to: Address,
+    /// Amount in quanta.
+    pub amount: Amount,
+}
 
 /// A single milestone in a milestone-based escrow.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -544,6 +594,40 @@ impl Transaction {
                 }
             }
             TxPayload::CastVote { .. } => {}
+            TxPayload::CreateSubAccount { label, budget, .. } => {
+                if label.len() > MAX_SUB_ACCOUNT_LABEL_LEN {
+                    return Err(BaudError::TransactionTooLarge {
+                        size: label.len(),
+                        max: MAX_SUB_ACCOUNT_LABEL_LEN,
+                    });
+                }
+                if *budget == 0 {
+                    return Err(BaudError::ZeroAmount);
+                }
+            }
+            TxPayload::DelegatedTransfer { amount, .. } => {
+                if *amount == 0 {
+                    return Err(BaudError::ZeroAmount);
+                }
+            }
+            TxPayload::SetArbitrator { .. } => {}
+            TxPayload::ArbitrateDispute { .. } => {}
+            TxPayload::BatchTransfer { transfers } => {
+                if transfers.is_empty() || transfers.len() > MAX_BATCH_ENTRIES {
+                    return Err(BaudError::TransactionTooLarge {
+                        size: transfers.len(),
+                        max: MAX_BATCH_ENTRIES,
+                    });
+                }
+                for entry in transfers {
+                    if entry.amount == 0 {
+                        return Err(BaudError::ZeroAmount);
+                    }
+                    if self.sender == entry.to {
+                        return Err(BaudError::SelfTransfer);
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -817,6 +901,26 @@ pub const MAX_PROPOSAL_DESCRIPTION_LEN: usize = 1024;
 /// Minimum voting period (1 hour in ms).
 pub const MIN_VOTING_PERIOD: u64 = 3_600_000;
 
+// ─── Sub-accounts ───────────────────────────────────────────────────────────
+
+/// A delegated sub-account with a spending budget.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubAccount {
+    pub id: Hash,
+    /// The parent account that created this sub-account.
+    pub owner: Address,
+    /// Human-readable label.
+    pub label: Vec<u8>,
+    /// Maximum budget in quanta.
+    pub budget: Amount,
+    /// Amount already spent.
+    pub spent: Amount,
+    /// Expiry timestamp (Unix ms, 0 = no expiry).
+    pub expiry: u64,
+    /// Block height at which the sub-account was created.
+    pub created_at_height: u64,
+}
+
 // ─── Extended State ─────────────────────────────────────────────────────────
 
 /// Extended state for new features (stored separately from WorldState to
@@ -835,6 +939,10 @@ pub struct ExtendedState {
     pub proposals: std::collections::HashMap<Hash, Proposal>,
     /// Votes per proposal: proposal_id → list of votes.
     pub votes: std::collections::HashMap<Hash, Vec<Vote>>,
+    /// Sub-accounts indexed by ID.
+    pub sub_accounts: std::collections::HashMap<Hash, SubAccount>,
+    /// Arbitrators assigned to disputed agreements: agreement_id → arbitrator address.
+    pub arbitrators: std::collections::HashMap<Hash, Address>,
 }
 
 impl Account {

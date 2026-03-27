@@ -1123,7 +1123,7 @@ async function submitEscrow() {
 // ── Explorer ──
 function renderExplorer() {
   return `<div class="page">
-    <div class="page-header"><h1>Explorer</h1><p>Look up transactions and escrows by their ID</p></div>
+    <div class="page-header"><h1>Explorer</h1><p>Look up transactions, escrows, agreements, proposals, and sub-accounts by their ID</p></div>
     <div class="two-col">
       <div class="card">
         <div class="section-title">Transaction Lookup</div>
@@ -1148,6 +1148,58 @@ function renderExplorer() {
           <button class="btn btn-primary" onclick="lookupEscrow()" style="height:42px">Look Up</button>
         </div>
         <div id="escrow-lookup-result" style="margin-top:16px"></div>
+      </div>
+    </div>
+    <div class="two-col" style="margin-top:20px">
+      <div class="card">
+        <div class="section-title">Agreement Lookup</div>
+        <div style="display:flex;gap:12px;align-items:end">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label>Agreement ID</label>
+            <input type="text" id="agreement-lookup-id" placeholder="Enter agreement ID" class="mono"
+                   onkeydown="if(event.key==='Enter')lookupAgreement()">
+          </div>
+          <button class="btn btn-primary" onclick="lookupAgreement()" style="height:42px">Look Up</button>
+        </div>
+        <div id="agreement-lookup-result" style="margin-top:16px"></div>
+      </div>
+      <div class="card">
+        <div class="section-title">Proposal Lookup</div>
+        <div style="display:flex;gap:12px;align-items:end">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label>Proposal ID</label>
+            <input type="text" id="proposal-lookup-id" placeholder="Enter proposal ID" class="mono"
+                   onkeydown="if(event.key==='Enter')lookupProposal()">
+          </div>
+          <button class="btn btn-primary" onclick="lookupProposal()" style="height:42px">Look Up</button>
+        </div>
+        <div id="proposal-lookup-result" style="margin-top:16px"></div>
+      </div>
+    </div>
+    <div class="two-col" style="margin-top:20px">
+      <div class="card">
+        <div class="section-title">Sub-Account Lookup</div>
+        <div style="display:flex;gap:12px;align-items:end">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label>Sub-Account ID</label>
+            <input type="text" id="sub-account-lookup-id" placeholder="Enter sub-account ID" class="mono"
+                   onkeydown="if(event.key==='Enter')lookupSubAccount()">
+          </div>
+          <button class="btn btn-primary" onclick="lookupSubAccount()" style="height:42px">Look Up</button>
+        </div>
+        <div id="sub-account-lookup-result" style="margin-top:16px"></div>
+      </div>
+      <div class="card">
+        <div class="section-title">Reputation Lookup</div>
+        <div style="display:flex;gap:12px;align-items:end">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label>Agent Address</label>
+            <input type="text" id="rep-lookup-addr" placeholder="Enter agent address" class="mono"
+                   onkeydown="if(event.key==='Enter')lookupReputation()">
+          </div>
+          <button class="btn btn-primary" onclick="lookupReputation()" style="height:42px">Look Up</button>
+        </div>
+        <div id="rep-lookup-result" style="margin-top:16px"></div>
       </div>
     </div>
     <div class="card" style="margin-top:20px">
@@ -1285,6 +1337,94 @@ async function submitEscrowRefund() {
     });
     const data = await resp.json();
     el.innerHTML = resp.ok ? `<div class="alert alert-success">Escrow refunded!<br><span class="mono">${data.tx_hash}</span></div>` : `<div class="alert alert-error">${escapeHtml(data.error)}</div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+async function lookupAgreement() {
+  const id = $('#agreement-lookup-id').value.trim();
+  const el = $('#agreement-lookup-result');
+  if (!id) { el.innerHTML = '<div class="alert alert-error">Enter an agreement ID</div>'; return; }
+  el.innerHTML = '<div class="alert alert-info">Looking up…</div>';
+  try {
+    const resp = await fetch(API + '/v1/agreement/' + encodeURIComponent(id));
+    const data = await resp.json();
+    if (!resp.ok) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error)}</div>`; return; }
+    const sc = data.status === 'completed' ? 'var(--success)' : data.status === 'disputed' ? 'var(--error)' : 'var(--accent)';
+    el.innerHTML = `<div class="card" style="margin-top:12px"><table class="info-table"><tbody>
+      <tr><td style="color:var(--text3)">ID</td><td class="mono" style="word-break:break-all">${escapeHtml(data.id)}</td></tr>
+      <tr><td style="color:var(--text3)">Status</td><td><strong style="color:${sc}">${escapeHtml(data.status)}</strong></td></tr>
+      <tr><td style="color:var(--text3)">Client</td><td class="mono" style="word-break:break-all">${escapeHtml(data.client)}</td></tr>
+      <tr><td style="color:var(--text3)">Provider</td><td class="mono" style="word-break:break-all">${escapeHtml(data.provider)}</td></tr>
+      <tr><td style="color:var(--text3)">Description</td><td>${escapeHtml(data.description)}</td></tr>
+      <tr><td style="color:var(--text3)">Payment</td><td><strong>${fmtBaud(parseInt(data.payment_amount))} BAUD</strong></td></tr>
+      <tr><td style="color:var(--text3)">Deadline</td><td>${data.deadline}</td></tr>
+    </tbody></table></div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+async function lookupProposal() {
+  const id = $('#proposal-lookup-id').value.trim();
+  const el = $('#proposal-lookup-result');
+  if (!id) { el.innerHTML = '<div class="alert alert-error">Enter a proposal ID</div>'; return; }
+  el.innerHTML = '<div class="alert alert-info">Looking up…</div>';
+  try {
+    const resp = await fetch(API + '/v1/proposal/' + encodeURIComponent(id));
+    const data = await resp.json();
+    if (!resp.ok) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error)}</div>`; return; }
+    const sc = data.status === 'passed' ? 'var(--success)' : data.status === 'rejected' ? 'var(--error)' : 'var(--accent)';
+    el.innerHTML = `<div class="card" style="margin-top:12px"><table class="info-table"><tbody>
+      <tr><td style="color:var(--text3)">ID</td><td class="mono" style="word-break:break-all">${escapeHtml(data.id)}</td></tr>
+      <tr><td style="color:var(--text3)">Status</td><td><strong style="color:${sc}">${escapeHtml(data.status)}</strong></td></tr>
+      <tr><td style="color:var(--text3)">Proposer</td><td class="mono" style="word-break:break-all">${escapeHtml(data.proposer)}</td></tr>
+      <tr><td style="color:var(--text3)">Title</td><td><strong>${escapeHtml(data.title)}</strong></td></tr>
+      <tr><td style="color:var(--text3)">Description</td><td>${escapeHtml(data.description)}</td></tr>
+      <tr><td style="color:var(--text3)">Votes For</td><td style="color:var(--success)">${data.votes_for}</td></tr>
+      <tr><td style="color:var(--text3)">Votes Against</td><td style="color:var(--error)">${data.votes_against}</td></tr>
+      <tr><td style="color:var(--text3)">Quorum</td><td>${data.quorum}</td></tr>
+      <tr><td style="color:var(--text3)">Deadline</td><td>${data.voting_deadline}</td></tr>
+    </tbody></table></div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+async function lookupSubAccount() {
+  const id = $('#sub-account-lookup-id').value.trim();
+  const el = $('#sub-account-lookup-result');
+  if (!id) { el.innerHTML = '<div class="alert alert-error">Enter a sub-account ID</div>'; return; }
+  el.innerHTML = '<div class="alert alert-info">Looking up…</div>';
+  try {
+    const resp = await fetch(API + '/v1/sub-account/' + encodeURIComponent(id));
+    const data = await resp.json();
+    if (!resp.ok) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error)}</div>`; return; }
+    el.innerHTML = `<div class="card" style="margin-top:12px"><table class="info-table"><tbody>
+      <tr><td style="color:var(--text3)">ID</td><td class="mono" style="word-break:break-all">${escapeHtml(data.id)}</td></tr>
+      <tr><td style="color:var(--text3)">Owner</td><td class="mono" style="word-break:break-all">${escapeHtml(data.owner)}</td></tr>
+      <tr><td style="color:var(--text3)">Label</td><td><strong>${escapeHtml(data.label)}</strong></td></tr>
+      <tr><td style="color:var(--text3)">Budget</td><td>${fmtBaud(parseInt(data.budget))} BAUD</td></tr>
+      <tr><td style="color:var(--text3)">Spent</td><td style="color:var(--error)">${fmtBaud(parseInt(data.spent))} BAUD</td></tr>
+      <tr><td style="color:var(--text3)">Remaining</td><td style="color:var(--success)">${fmtBaud(parseInt(data.remaining))} BAUD</td></tr>
+      <tr><td style="color:var(--text3)">Expiry</td><td>${data.expiry}</td></tr>
+    </tbody></table></div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
+}
+
+async function lookupReputation() {
+  const addr = $('#rep-lookup-addr').value.trim();
+  const el = $('#rep-lookup-result');
+  if (!addr) { el.innerHTML = '<div class="alert alert-error">Enter an address</div>'; return; }
+  el.innerHTML = '<div class="alert alert-info">Looking up…</div>';
+  try {
+    const resp = await fetch(API + '/v1/reputation/' + encodeURIComponent(addr));
+    const data = await resp.json();
+    if (!resp.ok) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error)}</div>`; return; }
+    const avg = data.average_score !== null ? data.average_score.toFixed(1) : 'N/A';
+    el.innerHTML = `<div class="card" style="margin-top:12px"><table class="info-table"><tbody>
+      <tr><td style="color:var(--text3)">Address</td><td class="mono" style="word-break:break-all">${escapeHtml(data.address)}</td></tr>
+      <tr><td style="color:var(--text3)">Average Score</td><td><strong style="color:var(--accent)">${avg}</strong></td></tr>
+      <tr><td style="color:var(--text3)">Total Score</td><td>${data.total_score}</td></tr>
+      <tr><td style="color:var(--text3)">Ratings</td><td>${data.rating_count}</td></tr>
+      <tr><td style="color:var(--text3)">Successful Jobs</td><td style="color:var(--success)">${data.successful_jobs}</td></tr>
+      <tr><td style="color:var(--text3)">Failed Jobs</td><td style="color:var(--error)">${data.failed_jobs}</td></tr>
+    </tbody></table></div>`;
   } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
 }
 

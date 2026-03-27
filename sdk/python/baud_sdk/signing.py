@@ -86,6 +86,22 @@ _VARIANT_AGENT_REGISTER = 4
 _VARIANT_MILESTONE_CREATE = 5
 _VARIANT_MILESTONE_RELEASE = 6
 _VARIANT_SET_SPENDING_POLICY = 7
+_VARIANT_CO_SIGNED_TRANSFER = 8
+_VARIANT_UPDATE_AGENT_PRICING = 9
+_VARIANT_RATE_AGENT = 10
+_VARIANT_CREATE_RECURRING_PAYMENT = 11
+_VARIANT_CANCEL_RECURRING_PAYMENT = 12
+_VARIANT_CREATE_SERVICE_AGREEMENT = 13
+_VARIANT_ACCEPT_SERVICE_AGREEMENT = 14
+_VARIANT_COMPLETE_SERVICE_AGREEMENT = 15
+_VARIANT_DISPUTE_SERVICE_AGREEMENT = 16
+_VARIANT_CREATE_PROPOSAL = 17
+_VARIANT_CAST_VOTE = 18
+_VARIANT_CREATE_SUB_ACCOUNT = 19
+_VARIANT_DELEGATED_TRANSFER = 20
+_VARIANT_SET_ARBITRATOR = 21
+_VARIANT_ARBITRATE_DISPUTE = 22
+_VARIANT_BATCH_TRANSFER = 23
 
 
 def _encode_transfer(to: bytes, amount: int, memo: Optional[bytes]) -> bytes:
@@ -405,6 +421,135 @@ def sign_agent_register(
             "name": name,
             "endpoint": endpoint,
             "capabilities": capabilities,
+        },
+        "timestamp": ts,
+        "chain_id": chain_id,
+        "signature": signature.hex(),
+        "tx_hash": tx_hash.hex(),
+    }
+
+
+def _encode_batch_transfer(transfers: list[tuple[bytes, int]]) -> bytes:
+    """Encode BatchTransfer payload. transfers is a list of (to_bytes, amount)."""
+    result = _encode_u32(_VARIANT_BATCH_TRANSFER)
+    result += _encode_u64(len(transfers))
+    for to_bytes, amount in transfers:
+        result += _encode_bytes_fixed(to_bytes) + _encode_u128(amount)
+    return result
+
+
+def _encode_create_sub_account(label: bytes, budget: int, expiry: int) -> bytes:
+    return (
+        _encode_u32(_VARIANT_CREATE_SUB_ACCOUNT)
+        + _encode_vec_u8(label)
+        + _encode_u128(budget)
+        + _encode_u64(expiry)
+    )
+
+
+def _encode_delegated_transfer(sub_account_id: bytes, to: bytes, amount: int) -> bytes:
+    return (
+        _encode_u32(_VARIANT_DELEGATED_TRANSFER)
+        + _encode_bytes_fixed(sub_account_id)
+        + _encode_bytes_fixed(to)
+        + _encode_u128(amount)
+    )
+
+
+def sign_batch_transfer(
+    keypair: NativeKeyPair,
+    transfers: list[tuple[str, int]],
+    nonce: int,
+    chain_id: str = "baud-mainnet",
+    timestamp: Optional[int] = None,
+) -> dict:
+    """Create and sign a BatchTransfer transaction.
+
+    Args:
+        transfers: List of (recipient_hex, amount) tuples.
+    """
+    ts = timestamp or now_ms()
+    encoded_transfers = [(bytes.fromhex(to), amt) for to, amt in transfers]
+
+    payload_enc = _encode_batch_transfer(encoded_transfers)
+    sig_hash = compute_signable_hash(keypair.address, nonce, payload_enc, ts, chain_id)
+    signature = keypair.sign(sig_hash)
+    tx_hash = compute_tx_hash(keypair.address, nonce, payload_enc, ts, chain_id, signature)
+
+    return {
+        "sender": keypair.address_hex,
+        "nonce": nonce,
+        "payload": {
+            "type": "BatchTransfer",
+            "transfers": [{"to": to, "amount": amt} for to, amt in transfers],
+        },
+        "timestamp": ts,
+        "chain_id": chain_id,
+        "signature": signature.hex(),
+        "tx_hash": tx_hash.hex(),
+    }
+
+
+def sign_create_sub_account(
+    keypair: NativeKeyPair,
+    label: str,
+    budget: int,
+    expiry: int = 0,
+    nonce: int = 0,
+    chain_id: str = "baud-mainnet",
+    timestamp: Optional[int] = None,
+) -> dict:
+    """Create and sign a CreateSubAccount transaction."""
+    ts = timestamp or now_ms()
+
+    payload_enc = _encode_create_sub_account(label.encode("utf-8"), budget, expiry)
+    sig_hash = compute_signable_hash(keypair.address, nonce, payload_enc, ts, chain_id)
+    signature = keypair.sign(sig_hash)
+    tx_hash = compute_tx_hash(keypair.address, nonce, payload_enc, ts, chain_id, signature)
+
+    return {
+        "sender": keypair.address_hex,
+        "nonce": nonce,
+        "payload": {
+            "type": "CreateSubAccount",
+            "label": label,
+            "budget": budget,
+            "expiry": expiry,
+        },
+        "timestamp": ts,
+        "chain_id": chain_id,
+        "signature": signature.hex(),
+        "tx_hash": tx_hash.hex(),
+    }
+
+
+def sign_delegated_transfer(
+    keypair: NativeKeyPair,
+    sub_account_id_hex: str,
+    to_hex: str,
+    amount: int,
+    nonce: int = 0,
+    chain_id: str = "baud-mainnet",
+    timestamp: Optional[int] = None,
+) -> dict:
+    """Create and sign a DelegatedTransfer from a sub-account."""
+    ts = timestamp or now_ms()
+    sub_id = bytes.fromhex(sub_account_id_hex)
+    to_bytes = bytes.fromhex(to_hex)
+
+    payload_enc = _encode_delegated_transfer(sub_id, to_bytes, amount)
+    sig_hash = compute_signable_hash(keypair.address, nonce, payload_enc, ts, chain_id)
+    signature = keypair.sign(sig_hash)
+    tx_hash = compute_tx_hash(keypair.address, nonce, payload_enc, ts, chain_id, signature)
+
+    return {
+        "sender": keypair.address_hex,
+        "nonce": nonce,
+        "payload": {
+            "type": "DelegatedTransfer",
+            "sub_account_id": sub_account_id_hex,
+            "to": to_hex,
+            "amount": amount,
         },
         "timestamp": ts,
         "chain_id": chain_id,

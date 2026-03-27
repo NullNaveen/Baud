@@ -1,9 +1,10 @@
 name: Publish MCP Server to npm
 
-# Requires NPM_TOKEN secret:
+# Requires NPM_TOKEN secret (Classic Automation token):
 #   1. Create an npm account at https://www.npmjs.com/signup
-#   2. Generate an access token: npm token create --type=publish
-#   3. Add as repo secret: Settings > Secrets > Actions > New > NPM_TOKEN
+#   2. Go to Access Tokens → Generate New Token → Classic Token
+#   3. Select type "Automation" (bypasses 2FA for CI/CD)
+#   4. Add as repo secret: Settings > Secrets > Actions > New > NPM_TOKEN
 
 on:
   release:

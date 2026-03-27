@@ -999,3 +999,346 @@ fn recurring_payment_create_and_cancel() {
         baud_core::types::RecurringPaymentStatus::Cancelled,
     );
 }
+
+// ─── Sub-account Tests ──────────────────────────────────────────────────
+
+#[test]
+fn sub_account_create_and_delegated_transfer() {
+    let owner = KeyPair::generate();
+    let recipient = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state.accounts.insert(
+        owner.address(),
+        Account::with_balance(owner.address(), 10_000),
+    );
+
+    // Create sub-account with budget 5000.
+    let mut create_tx = Transaction {
+        sender: owner.address(),
+        nonce: 0,
+        payload: TxPayload::CreateSubAccount {
+            label: b"ops-budget".to_vec(),
+            budget: 5_000,
+            expiry: 0, // no expiry
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = create_tx.signable_hash();
+    create_tx.signature = owner.sign(h.as_bytes());
+
+    state.validate_transaction(&create_tx, 1_000_000).unwrap();
+    state.apply_transaction(&create_tx).unwrap();
+
+    let sub_id = create_tx.hash();
+    let sub = state.extended.sub_accounts.get(&sub_id).unwrap();
+    assert_eq!(sub.budget, 5_000);
+    assert_eq!(sub.spent, 0);
+    assert_eq!(state.balance_of(&owner.address()), 5_000); // 10000 - 5000 locked
+
+    // Delegated transfer of 2000 from sub-account.
+    let mut del_tx = Transaction {
+        sender: owner.address(),
+        nonce: 1,
+        payload: TxPayload::DelegatedTransfer {
+            sub_account_id: sub_id,
+            to: recipient.address(),
+            amount: 2_000,
+        },
+        timestamp: 2_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = del_tx.signable_hash();
+    del_tx.signature = owner.sign(h.as_bytes());
+
+    state.validate_transaction(&del_tx, 2_000_000).unwrap();
+    state.apply_transaction(&del_tx).unwrap();
+
+    let sub = state.extended.sub_accounts.get(&sub_id).unwrap();
+    assert_eq!(sub.spent, 2_000);
+    assert_eq!(state.balance_of(&recipient.address()), 2_000);
+
+    // Exceeding budget should fail.
+    let mut over_tx = Transaction {
+        sender: owner.address(),
+        nonce: 2,
+        payload: TxPayload::DelegatedTransfer {
+            sub_account_id: sub_id,
+            to: recipient.address(),
+            amount: 4_000, // only 3000 remaining
+        },
+        timestamp: 3_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = over_tx.signable_hash();
+    over_tx.signature = owner.sign(h.as_bytes());
+
+    let result = state.validate_transaction(&over_tx, 3_000_000);
+    assert!(result.is_err());
+    assert!(format!("{}", result.unwrap_err()).contains("budget exceeded"));
+}
+
+// ─── Arbitration Tests ──────────────────────────────────────────────────
+
+#[test]
+fn arbitrate_disputed_agreement() {
+    let client = KeyPair::generate();
+    let provider = KeyPair::generate();
+    let arbitrator = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state.accounts.insert(
+        client.address(),
+        Account::with_balance(client.address(), 10_000),
+    );
+    state.accounts.insert(
+        provider.address(),
+        Account::with_balance(provider.address(), 1_000),
+    );
+    state.accounts.insert(
+        arbitrator.address(),
+        Account::with_balance(arbitrator.address(), 100),
+    );
+
+    // 1. Create service agreement.
+    let mut create_tx = Transaction {
+        sender: client.address(),
+        nonce: 0,
+        payload: TxPayload::CreateServiceAgreement {
+            provider: provider.address(),
+            description: b"Build a website".to_vec(),
+            payment_amount: 5_000,
+            deadline: 10_000_000,
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = create_tx.signable_hash();
+    create_tx.signature = client.sign(h.as_bytes());
+    state.validate_transaction(&create_tx, 1_000_000).unwrap();
+    state.apply_transaction(&create_tx).unwrap();
+    let agreement_id = create_tx.hash();
+    assert_eq!(state.balance_of(&client.address()), 5_000); // 10000 - 5000 locked
+
+    // 2. Provider accepts.
+    let mut accept_tx = Transaction {
+        sender: provider.address(),
+        nonce: 0,
+        payload: TxPayload::AcceptServiceAgreement { agreement_id },
+        timestamp: 2_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = accept_tx.signable_hash();
+    accept_tx.signature = provider.sign(h.as_bytes());
+    state.validate_transaction(&accept_tx, 2_000_000).unwrap();
+    state.apply_transaction(&accept_tx).unwrap();
+
+    // 3. Client disputes.
+    let mut dispute_tx = Transaction {
+        sender: client.address(),
+        nonce: 1,
+        payload: TxPayload::DisputeServiceAgreement { agreement_id },
+        timestamp: 3_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = dispute_tx.signable_hash();
+    dispute_tx.signature = client.sign(h.as_bytes());
+    state.validate_transaction(&dispute_tx, 3_000_000).unwrap();
+    state.apply_transaction(&dispute_tx).unwrap();
+
+    // Note: DisputeServiceAgreement in current v1 refunds full amount to client.
+    // Our arbitration flow re-allocates from the agreement's payment_amount.
+    // Since dispute already refunded, we need to re-lock. For this test,
+    // let's reset by modifying state to test the arbitration logic properly.
+    // Re-create a fresh agreement for arbitration testing.
+    let mut create_tx2 = Transaction {
+        sender: client.address(),
+        nonce: 2,
+        payload: TxPayload::CreateServiceAgreement {
+            provider: provider.address(),
+            description: b"Build a mobile app".to_vec(),
+            payment_amount: 4_000,
+            deadline: 10_000_000,
+        },
+        timestamp: 4_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = create_tx2.signable_hash();
+    create_tx2.signature = client.sign(h.as_bytes());
+    state.validate_transaction(&create_tx2, 4_000_000).unwrap();
+    state.apply_transaction(&create_tx2).unwrap();
+    let agreement_id2 = create_tx2.hash();
+
+    // Provider accepts.
+    let mut accept_tx2 = Transaction {
+        sender: provider.address(),
+        nonce: 1,
+        payload: TxPayload::AcceptServiceAgreement {
+            agreement_id: agreement_id2,
+        },
+        timestamp: 5_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = accept_tx2.signable_hash();
+    accept_tx2.signature = provider.sign(h.as_bytes());
+    state.validate_transaction(&accept_tx2, 5_000_000).unwrap();
+    state.apply_transaction(&accept_tx2).unwrap();
+
+    // Dispute.
+    let mut dispute_tx2 = Transaction {
+        sender: client.address(),
+        nonce: 3,
+        payload: TxPayload::DisputeServiceAgreement {
+            agreement_id: agreement_id2,
+        },
+        timestamp: 6_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = dispute_tx2.signable_hash();
+    dispute_tx2.signature = client.sign(h.as_bytes());
+    state.validate_transaction(&dispute_tx2, 6_000_000).unwrap();
+    state.apply_transaction(&dispute_tx2).unwrap();
+
+    // 4. Client sets arbitrator.
+    let mut set_arb_tx = Transaction {
+        sender: client.address(),
+        nonce: 4,
+        payload: TxPayload::SetArbitrator {
+            agreement_id: agreement_id2,
+            arbitrator: arbitrator.address(),
+        },
+        timestamp: 7_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = set_arb_tx.signable_hash();
+    set_arb_tx.signature = client.sign(h.as_bytes());
+    state.validate_transaction(&set_arb_tx, 7_000_000).unwrap();
+    state.apply_transaction(&set_arb_tx).unwrap();
+
+    assert!(state.extended.arbitrators.contains_key(&agreement_id2));
+
+    // 5. Arbitrator resolves: 3000 to provider, 1000 refunded to client.
+    let provider_bal_before = state.balance_of(&provider.address());
+    let client_bal_before = state.balance_of(&client.address());
+
+    let mut arb_tx = Transaction {
+        sender: arbitrator.address(),
+        nonce: 0,
+        payload: TxPayload::ArbitrateDispute {
+            agreement_id: agreement_id2,
+            provider_amount: 3_000,
+        },
+        timestamp: 8_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = arb_tx.signable_hash();
+    arb_tx.signature = arbitrator.sign(h.as_bytes());
+    state.validate_transaction(&arb_tx, 8_000_000).unwrap();
+    state.apply_transaction(&arb_tx).unwrap();
+
+    assert_eq!(
+        state.balance_of(&provider.address()),
+        provider_bal_before + 3_000
+    );
+    assert_eq!(
+        state.balance_of(&client.address()),
+        client_bal_before + 1_000
+    );
+
+    let agreement = state
+        .extended
+        .service_agreements
+        .get(&agreement_id2)
+        .unwrap();
+    assert_eq!(agreement.status, AgreementStatus::Completed);
+    assert!(!state.extended.arbitrators.contains_key(&agreement_id2));
+}
+
+// ─── Batch Transfer Tests ───────────────────────────────────────────────
+
+#[test]
+fn batch_transfer_atomic() {
+    let sender = KeyPair::generate();
+    let r1 = KeyPair::generate();
+    let r2 = KeyPair::generate();
+    let r3 = KeyPair::generate();
+
+    let mut state = WorldState::new("baud-test".into());
+    state.accounts.insert(
+        sender.address(),
+        Account::with_balance(sender.address(), 10_000),
+    );
+
+    let mut batch_tx = Transaction {
+        sender: sender.address(),
+        nonce: 0,
+        payload: TxPayload::BatchTransfer {
+            transfers: vec![
+                BatchEntry {
+                    to: r1.address(),
+                    amount: 1_000,
+                },
+                BatchEntry {
+                    to: r2.address(),
+                    amount: 2_000,
+                },
+                BatchEntry {
+                    to: r3.address(),
+                    amount: 3_000,
+                },
+            ],
+        },
+        timestamp: 1_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = batch_tx.signable_hash();
+    batch_tx.signature = sender.sign(h.as_bytes());
+
+    state.validate_transaction(&batch_tx, 1_000_000).unwrap();
+    state.apply_transaction(&batch_tx).unwrap();
+
+    assert_eq!(state.balance_of(&sender.address()), 4_000); // 10000 - 6000
+    assert_eq!(state.balance_of(&r1.address()), 1_000);
+    assert_eq!(state.balance_of(&r2.address()), 2_000);
+    assert_eq!(state.balance_of(&r3.address()), 3_000);
+
+    // Over-budget batch should fail.
+    let mut over_tx = Transaction {
+        sender: sender.address(),
+        nonce: 1,
+        payload: TxPayload::BatchTransfer {
+            transfers: vec![
+                BatchEntry {
+                    to: r1.address(),
+                    amount: 3_000,
+                },
+                BatchEntry {
+                    to: r2.address(),
+                    amount: 2_000,
+                },
+            ],
+        },
+        timestamp: 2_000_000,
+        chain_id: "baud-test".into(),
+        signature: Signature::zero(),
+    };
+    let h = over_tx.signable_hash();
+    over_tx.signature = sender.sign(h.as_bytes());
+
+    let result = state.validate_transaction(&over_tx, 2_000_000);
+    assert!(result.is_err());
+    assert!(format!("{}", result.unwrap_err()).contains("batch total"));
+}

@@ -11,8 +11,8 @@ use crate::error::{BaudError, BaudResult};
 use crate::types::{
     Account, AgentMeta, AgentPricing, AgreementStatus, Amount, Escrow, EscrowStatus,
     ExtendedState, MilestoneEscrow, MilestoneState, Proposal, ProposalStatus, RecurringPayment,
-    RecurringPaymentStatus, Reputation, ServiceAgreement, SpendingPolicy, Transaction, TxPayload,
-    Vote,
+    RecurringPaymentStatus, Reputation, ServiceAgreement, SpendingPolicy, SubAccount, Transaction,
+    TxPayload, Vote,
 };
 
 // ─── World State ────────────────────────────────────────────────────────────
@@ -492,6 +492,110 @@ impl WorldState {
                 }
                 if current_time > proposal.voting_deadline {
                     return Err(BaudError::VotingPeriodEnded);
+                }
+            }
+            TxPayload::CreateSubAccount { budget, .. } => {
+                if account.balance < *budget {
+                    return Err(BaudError::InsufficientBalance {
+                        have: account.balance,
+                        need: *budget,
+                    });
+                }
+            }
+            TxPayload::DelegatedTransfer {
+                sub_account_id,
+                amount,
+                ..
+            } => {
+                let sub = self
+                    .extended
+                    .sub_accounts
+                    .get(sub_account_id)
+                    .ok_or_else(|| {
+                        BaudError::SubAccountNotFound(sub_account_id.to_hex())
+                    })?;
+                if sub.owner != tx.sender {
+                    return Err(BaudError::SubAccountUnauthorized(
+                        "only the owner can spend from a sub-account".into(),
+                    ));
+                }
+                if sub.expiry > 0 && current_time > sub.expiry {
+                    return Err(BaudError::SubAccountExpired(sub.expiry));
+                }
+                let remaining = sub.budget.saturating_sub(sub.spent);
+                if *amount > remaining {
+                    return Err(BaudError::SubAccountBudgetExceeded {
+                        remaining,
+                        need: *amount,
+                    });
+                }
+            }
+            TxPayload::SetArbitrator { agreement_id, .. } => {
+                let agreement = self
+                    .extended
+                    .service_agreements
+                    .get(agreement_id)
+                    .ok_or_else(|| {
+                        BaudError::AgreementNotFound(agreement_id.to_hex())
+                    })?;
+                if agreement.status != AgreementStatus::Disputed {
+                    return Err(BaudError::InvalidAgreementStatus(
+                        format!("{:?} (must be Disputed)", agreement.status),
+                    ));
+                }
+                // Both client and provider must agree on arbitrator;
+                // either party can propose one.
+                if agreement.client != tx.sender && agreement.provider != tx.sender {
+                    return Err(BaudError::AgreementUnauthorized(
+                        "only client or provider can set an arbitrator".into(),
+                    ));
+                }
+            }
+            TxPayload::ArbitrateDispute {
+                agreement_id,
+                provider_amount,
+            } => {
+                let agreement = self
+                    .extended
+                    .service_agreements
+                    .get(agreement_id)
+                    .ok_or_else(|| {
+                        BaudError::AgreementNotFound(agreement_id.to_hex())
+                    })?;
+                if agreement.status != AgreementStatus::Disputed {
+                    return Err(BaudError::InvalidAgreementStatus(
+                        format!("{:?} (must be Disputed)", agreement.status),
+                    ));
+                }
+                let arbitrator = self
+                    .extended
+                    .arbitrators
+                    .get(agreement_id)
+                    .ok_or_else(|| {
+                        BaudError::ArbitratorNotSet(agreement_id.to_hex())
+                    })?;
+                if tx.sender != *arbitrator {
+                    return Err(BaudError::ArbitratorUnauthorized(
+                        "only the assigned arbitrator can resolve".into(),
+                    ));
+                }
+                if *provider_amount > agreement.payment_amount {
+                    return Err(BaudError::InsufficientBalance {
+                        have: agreement.payment_amount,
+                        need: *provider_amount,
+                    });
+                }
+            }
+            TxPayload::BatchTransfer { transfers } => {
+                let total: Amount = transfers
+                    .iter()
+                    .try_fold(0u128, |acc, e| acc.checked_add(e.amount))
+                    .ok_or(BaudError::Overflow)?;
+                if account.balance < total {
+                    return Err(BaudError::BatchTotalExceedsBalance {
+                        have: account.balance,
+                        need: total,
+                    });
                 }
             }
         }
@@ -1014,6 +1118,154 @@ impl WorldState {
                     .or_default()
                     .push(vote);
                 debug!(proposal = %proposal_id, in_favor = in_favor, "vote cast");
+            }
+
+            TxPayload::CreateSubAccount {
+                label,
+                budget,
+                expiry,
+            } => {
+                // Debit owner's balance to fund the sub-account budget.
+                {
+                    let sender = self
+                        .accounts
+                        .get_mut(&sender_addr)
+                        .ok_or_else(|| BaudError::AccountNotFound(sender_addr.to_hex()))?;
+                    sender.balance = sender.balance.checked_sub(*budget).ok_or(
+                        BaudError::InsufficientBalance {
+                            have: sender.balance,
+                            need: *budget,
+                        },
+                    )?;
+                }
+                let sub_id = tx.hash();
+                let sub = SubAccount {
+                    id: sub_id,
+                    owner: sender_addr,
+                    label: label.clone(),
+                    budget: *budget,
+                    spent: 0,
+                    expiry: *expiry,
+                    created_at_height: self.height,
+                };
+                self.extended.sub_accounts.insert(sub_id, sub);
+                debug!(id = %sub_id, budget = %budget, "sub-account created");
+            }
+
+            TxPayload::DelegatedTransfer {
+                sub_account_id,
+                to,
+                amount,
+            } => {
+                // Debit from sub-account budget (funds already locked).
+                let sub = self
+                    .extended
+                    .sub_accounts
+                    .get_mut(sub_account_id)
+                    .ok_or_else(|| BaudError::SubAccountNotFound(sub_account_id.to_hex()))?;
+                sub.spent = sub
+                    .spent
+                    .checked_add(*amount)
+                    .ok_or(BaudError::Overflow)?;
+
+                // Credit recipient.
+                let rec = self
+                    .accounts
+                    .entry(*to)
+                    .or_insert_with(|| Account::new(*to));
+                rec.balance = rec.balance.checked_add(*amount).ok_or(BaudError::Overflow)?;
+                debug!(sub = %sub_account_id, to = %to, amount = %amount, "delegated transfer");
+            }
+
+            TxPayload::SetArbitrator {
+                agreement_id,
+                arbitrator,
+            } => {
+                self.extended.arbitrators.insert(*agreement_id, *arbitrator);
+                debug!(agreement = %agreement_id, arbitrator = %arbitrator, "arbitrator set");
+            }
+
+            TxPayload::ArbitrateDispute {
+                agreement_id,
+                provider_amount,
+            } => {
+                let agreement = self
+                    .extended
+                    .service_agreements
+                    .get_mut(agreement_id)
+                    .ok_or_else(|| BaudError::AgreementNotFound(agreement_id.to_hex()))?;
+
+                let total = agreement.payment_amount;
+                let client_refund = total.saturating_sub(*provider_amount);
+                let provider_addr = agreement.provider;
+                let client_addr = agreement.client;
+
+                // Mark as resolved (Completed after arbitration).
+                agreement.status = AgreementStatus::Completed;
+
+                // Pay provider their share.
+                if *provider_amount > 0 {
+                    let prov = self
+                        .accounts
+                        .entry(provider_addr)
+                        .or_insert_with(|| Account::new(provider_addr));
+                    prov.balance = prov
+                        .balance
+                        .checked_add(*provider_amount)
+                        .ok_or(BaudError::Overflow)?;
+                }
+                // Refund client the remainder.
+                if client_refund > 0 {
+                    let cli = self
+                        .accounts
+                        .entry(client_addr)
+                        .or_insert_with(|| Account::new(client_addr));
+                    cli.balance = cli
+                        .balance
+                        .checked_add(client_refund)
+                        .ok_or(BaudError::Overflow)?;
+                }
+
+                // Remove arbitrator assignment.
+                self.extended.arbitrators.remove(agreement_id);
+                debug!(
+                    agreement = %agreement_id,
+                    provider_amount = %provider_amount,
+                    client_refund = %client_refund,
+                    "dispute arbitrated"
+                );
+            }
+
+            TxPayload::BatchTransfer { transfers } => {
+                // Debit total from sender.
+                let total: Amount = transfers
+                    .iter()
+                    .try_fold(0u128, |acc, e| acc.checked_add(e.amount))
+                    .ok_or(BaudError::Overflow)?;
+                {
+                    let sender = self
+                        .accounts
+                        .get_mut(&sender_addr)
+                        .ok_or_else(|| BaudError::AccountNotFound(sender_addr.to_hex()))?;
+                    sender.balance = sender.balance.checked_sub(total).ok_or(
+                        BaudError::InsufficientBalance {
+                            have: sender.balance,
+                            need: total,
+                        },
+                    )?;
+                }
+                // Credit each recipient.
+                for entry in transfers {
+                    let rec = self
+                        .accounts
+                        .entry(entry.to)
+                        .or_insert_with(|| Account::new(entry.to));
+                    rec.balance = rec
+                        .balance
+                        .checked_add(entry.amount)
+                        .ok_or(BaudError::Overflow)?;
+                }
+                debug!(count = transfers.len(), total = %total, "batch transfer applied");
             }
         }
 

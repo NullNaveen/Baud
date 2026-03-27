@@ -108,6 +108,27 @@ pub enum BaudError {
     #[error("already voted on this proposal")]
     AlreadyVoted,
 
+    #[error("sub-account not found: {0}")]
+    SubAccountNotFound(String),
+
+    #[error("sub-account budget exceeded: remaining {remaining}, need {need}")]
+    SubAccountBudgetExceeded { remaining: u128, need: u128 },
+
+    #[error("sub-account expired at {0}")]
+    SubAccountExpired(u64),
+
+    #[error("unauthorized sub-account operation: {0}")]
+    SubAccountUnauthorized(String),
+
+    #[error("arbitrator not set for agreement: {0}")]
+    ArbitratorNotSet(String),
+
+    #[error("unauthorized arbitrator operation: {0}")]
+    ArbitratorUnauthorized(String),
+
+    #[error("batch total exceeds balance: have {have}, need {need}")]
+    BatchTotalExceedsBalance { have: u128, need: u128 },
+
     #[error("nonce gap too large: current nonce {current}, got {got}, max gap {max_gap}")]
     NonceGapTooLarge {
         current: u64,
