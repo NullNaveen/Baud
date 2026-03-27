@@ -25,7 +25,7 @@ use axum::response::Html;
 use baud_core::crypto::{Address, Hash, KeyPair, Signature};
 use baud_core::mempool::Mempool;
 use baud_core::state::WorldState;
-use baud_core::types::{EscrowStatus, Transaction, TxPayload, AgreementStatus, ProposalStatus};
+use baud_core::types::{AgreementStatus, EscrowStatus, ProposalStatus, Transaction, TxPayload};
 
 static DASHBOARD_HTML: &str = include_str!("../dashboard.html");
 
@@ -1081,10 +1081,8 @@ fn parse_tx_request(
             co_signers,
             required_co_signers,
         } => {
-            let addrs: Result<Vec<Address>, _> = co_signers
-                .iter()
-                .map(|s| Address::from_hex(s))
-                .collect();
+            let addrs: Result<Vec<Address>, _> =
+                co_signers.iter().map(|s| Address::from_hex(s)).collect();
             let addrs = addrs.map_err(|e| {
                 (
                     StatusCode::BAD_REQUEST,
@@ -1115,9 +1113,7 @@ fn parse_tx_request(
             })?;
             let sigs: Result<Vec<(Address, Signature)>, _> = co_signatures
                 .iter()
-                .map(|(addr, sig)| {
-                    Ok((Address::from_hex(addr)?, Signature::from_hex(sig)?))
-                })
+                .map(|(addr, sig)| Ok((Address::from_hex(addr)?, Signature::from_hex(sig)?)))
                 .collect();
             let sigs = sigs.map_err(|e: Box<dyn std::error::Error>| {
                 (
@@ -1449,10 +1445,7 @@ async fn get_pricing(
     }
 }
 
-async fn get_proposal(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> impl IntoResponse {
+async fn get_proposal(State(state): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
     let pid = match Hash::from_hex(&id) {
         Ok(h) => h,
         Err(e) => {
@@ -1496,10 +1489,7 @@ async fn get_proposal(
     }
 }
 
-async fn get_agreement(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> impl IntoResponse {
+async fn get_agreement(State(state): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
     let aid = match Hash::from_hex(&id) {
         Ok(h) => h,
         Err(e) => {

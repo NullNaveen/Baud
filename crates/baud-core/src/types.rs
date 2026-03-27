@@ -189,9 +189,7 @@ pub enum TxPayload {
         max_payments: u32,
     },
     /// Cancel a recurring payment.
-    CancelRecurringPayment {
-        payment_id: Hash,
-    },
+    CancelRecurringPayment { payment_id: Hash },
     /// Propose a service agreement to another agent.
     CreateServiceAgreement {
         provider: Address,
@@ -203,17 +201,11 @@ pub enum TxPayload {
         deadline: u64,
     },
     /// Accept a proposed service agreement (locks payment in escrow).
-    AcceptServiceAgreement {
-        agreement_id: Hash,
-    },
+    AcceptServiceAgreement { agreement_id: Hash },
     /// Mark a service agreement as completed (releases payment).
-    CompleteServiceAgreement {
-        agreement_id: Hash,
-    },
+    CompleteServiceAgreement { agreement_id: Hash },
     /// Dispute a service agreement.
-    DisputeServiceAgreement {
-        agreement_id: Hash,
-    },
+    DisputeServiceAgreement { agreement_id: Hash },
     /// Create a governance proposal.
     CreateProposal {
         /// Title (max 128 bytes).

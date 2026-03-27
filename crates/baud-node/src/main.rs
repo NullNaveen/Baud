@@ -103,12 +103,10 @@ async fn main() -> Result<()> {
     };
 
     // Load extended state (new features) separately.
-    let extended = store
-        .load_extended_state()
-        .unwrap_or_else(|e| {
-            warn!("failed to load extended state: {e}, using defaults");
-            baud_core::types::ExtendedState::default()
-        });
+    let extended = store.load_extended_state().unwrap_or_else(|e| {
+        warn!("failed to load extended state: {e}, using defaults");
+        baud_core::types::ExtendedState::default()
+    });
 
     let mut state = state;
     state.extended = extended;

@@ -9,8 +9,8 @@ const MAX_ESCROWS_PER_ACCOUNT: usize = 1000;
 use crate::crypto::{verify_signature, Address, Hash};
 use crate::error::{BaudError, BaudResult};
 use crate::types::{
-    Account, AgentMeta, AgentPricing, AgreementStatus, Amount, Escrow, EscrowStatus,
-    ExtendedState, MilestoneEscrow, MilestoneState, Proposal, ProposalStatus, RecurringPayment,
+    Account, AgentMeta, AgentPricing, AgreementStatus, Amount, Escrow, EscrowStatus, ExtendedState,
+    MilestoneEscrow, MilestoneState, Proposal, ProposalStatus, RecurringPayment,
     RecurringPaymentStatus, Reputation, ServiceAgreement, SpendingPolicy, SubAccount, Transaction,
     TxPayload, Vote,
 };
@@ -338,20 +338,19 @@ impl WorldState {
                         let mut valid_co_signers = 0u32;
                         for (co_addr, co_sig) in co_signatures {
                             if !policy.co_signers.contains(co_addr) {
-                                return Err(BaudError::CoSignerValidationFailed(
-                                    format!("{} is not an authorized co-signer", co_addr),
-                                ));
+                                return Err(BaudError::CoSignerValidationFailed(format!(
+                                    "{} is not an authorized co-signer",
+                                    co_addr
+                                )));
                             }
                             verify_signature(co_addr, co_sign_hash.as_bytes(), co_sig)?;
                             valid_co_signers += 1;
                         }
                         if valid_co_signers < policy.required_co_signers {
-                            return Err(BaudError::CoSignerValidationFailed(
-                                format!(
-                                    "need {} co-signers, got {}",
-                                    policy.required_co_signers, valid_co_signers
-                                ),
-                            ));
+                            return Err(BaudError::CoSignerValidationFailed(format!(
+                                "need {} co-signers, got {}",
+                                policy.required_co_signers, valid_co_signers
+                            )));
                         }
                     }
                 }
@@ -363,9 +362,10 @@ impl WorldState {
                 // Target must exist as a registered agent.
                 let target_account = self.get_account(target);
                 if target_account.agent_meta.is_none() {
-                    return Err(BaudError::AccountNotFound(
-                        format!("target {} is not a registered agent", target),
-                    ));
+                    return Err(BaudError::AccountNotFound(format!(
+                        "target {} is not a registered agent",
+                        target
+                    )));
                 }
             }
             TxPayload::CreateRecurringPayment {
@@ -384,9 +384,7 @@ impl WorldState {
                     .extended
                     .recurring_payments
                     .get(payment_id)
-                    .ok_or_else(|| {
-                        BaudError::RecurringPaymentNotFound(payment_id.to_hex())
-                    })?;
+                    .ok_or_else(|| BaudError::RecurringPaymentNotFound(payment_id.to_hex()))?;
                 if payment.sender != tx.sender {
                     return Err(BaudError::CoSignerValidationFailed(
                         "only the sender can cancel a recurring payment".into(),
@@ -398,9 +396,7 @@ impl WorldState {
                     ));
                 }
             }
-            TxPayload::CreateServiceAgreement {
-                payment_amount, ..
-            } => {
+            TxPayload::CreateServiceAgreement { payment_amount, .. } => {
                 if account.balance < *payment_amount {
                     return Err(BaudError::InsufficientBalance {
                         have: account.balance,
@@ -413,18 +409,17 @@ impl WorldState {
                     .extended
                     .service_agreements
                     .get(agreement_id)
-                    .ok_or_else(|| {
-                        BaudError::AgreementNotFound(agreement_id.to_hex())
-                    })?;
+                    .ok_or_else(|| BaudError::AgreementNotFound(agreement_id.to_hex()))?;
                 if agreement.provider != tx.sender {
                     return Err(BaudError::AgreementUnauthorized(
                         "only the provider can accept".into(),
                     ));
                 }
                 if agreement.status != AgreementStatus::Proposed {
-                    return Err(BaudError::InvalidAgreementStatus(
-                        format!("{:?}", agreement.status),
-                    ));
+                    return Err(BaudError::InvalidAgreementStatus(format!(
+                        "{:?}",
+                        agreement.status
+                    )));
                 }
             }
             TxPayload::CompleteServiceAgreement { agreement_id } => {
@@ -432,9 +427,7 @@ impl WorldState {
                     .extended
                     .service_agreements
                     .get(agreement_id)
-                    .ok_or_else(|| {
-                        BaudError::AgreementNotFound(agreement_id.to_hex())
-                    })?;
+                    .ok_or_else(|| BaudError::AgreementNotFound(agreement_id.to_hex()))?;
                 // Client confirms completion.
                 if agreement.client != tx.sender {
                     return Err(BaudError::AgreementUnauthorized(
@@ -442,9 +435,10 @@ impl WorldState {
                     ));
                 }
                 if agreement.status != AgreementStatus::Accepted {
-                    return Err(BaudError::InvalidAgreementStatus(
-                        format!("{:?}", agreement.status),
-                    ));
+                    return Err(BaudError::InvalidAgreementStatus(format!(
+                        "{:?}",
+                        agreement.status
+                    )));
                 }
             }
             TxPayload::DisputeServiceAgreement { agreement_id } => {
@@ -452,9 +446,7 @@ impl WorldState {
                     .extended
                     .service_agreements
                     .get(agreement_id)
-                    .ok_or_else(|| {
-                        BaudError::AgreementNotFound(agreement_id.to_hex())
-                    })?;
+                    .ok_or_else(|| BaudError::AgreementNotFound(agreement_id.to_hex()))?;
                 // Either party can dispute.
                 if agreement.client != tx.sender && agreement.provider != tx.sender {
                     return Err(BaudError::AgreementUnauthorized(
@@ -462,9 +454,10 @@ impl WorldState {
                     ));
                 }
                 if agreement.status != AgreementStatus::Accepted {
-                    return Err(BaudError::InvalidAgreementStatus(
-                        format!("{:?}", agreement.status),
-                    ));
+                    return Err(BaudError::InvalidAgreementStatus(format!(
+                        "{:?}",
+                        agreement.status
+                    )));
                 }
             }
             TxPayload::CreateProposal { .. } => {
@@ -475,9 +468,7 @@ impl WorldState {
                     .extended
                     .proposals
                     .get(proposal_id)
-                    .ok_or_else(|| {
-                        BaudError::ProposalNotFound(proposal_id.to_hex())
-                    })?;
+                    .ok_or_else(|| BaudError::ProposalNotFound(proposal_id.to_hex()))?;
                 // Check for duplicate votes BEFORE status check so the
                 // error is correct even if the proposal already resolved.
                 if let Some(votes) = self.extended.votes.get(proposal_id) {
@@ -486,9 +477,7 @@ impl WorldState {
                     }
                 }
                 if proposal.status != ProposalStatus::Active {
-                    return Err(BaudError::ProposalNotFound(
-                        "proposal is not active".into(),
-                    ));
+                    return Err(BaudError::ProposalNotFound("proposal is not active".into()));
                 }
                 if current_time > proposal.voting_deadline {
                     return Err(BaudError::VotingPeriodEnded);
@@ -511,9 +500,7 @@ impl WorldState {
                     .extended
                     .sub_accounts
                     .get(sub_account_id)
-                    .ok_or_else(|| {
-                        BaudError::SubAccountNotFound(sub_account_id.to_hex())
-                    })?;
+                    .ok_or_else(|| BaudError::SubAccountNotFound(sub_account_id.to_hex()))?;
                 if sub.owner != tx.sender {
                     return Err(BaudError::SubAccountUnauthorized(
                         "only the owner can spend from a sub-account".into(),
@@ -535,13 +522,12 @@ impl WorldState {
                     .extended
                     .service_agreements
                     .get(agreement_id)
-                    .ok_or_else(|| {
-                        BaudError::AgreementNotFound(agreement_id.to_hex())
-                    })?;
+                    .ok_or_else(|| BaudError::AgreementNotFound(agreement_id.to_hex()))?;
                 if agreement.status != AgreementStatus::Disputed {
-                    return Err(BaudError::InvalidAgreementStatus(
-                        format!("{:?} (must be Disputed)", agreement.status),
-                    ));
+                    return Err(BaudError::InvalidAgreementStatus(format!(
+                        "{:?} (must be Disputed)",
+                        agreement.status
+                    )));
                 }
                 // Both client and provider must agree on arbitrator;
                 // either party can propose one.
@@ -559,21 +545,18 @@ impl WorldState {
                     .extended
                     .service_agreements
                     .get(agreement_id)
-                    .ok_or_else(|| {
-                        BaudError::AgreementNotFound(agreement_id.to_hex())
-                    })?;
+                    .ok_or_else(|| BaudError::AgreementNotFound(agreement_id.to_hex()))?;
                 if agreement.status != AgreementStatus::Disputed {
-                    return Err(BaudError::InvalidAgreementStatus(
-                        format!("{:?} (must be Disputed)", agreement.status),
-                    ));
+                    return Err(BaudError::InvalidAgreementStatus(format!(
+                        "{:?} (must be Disputed)",
+                        agreement.status
+                    )));
                 }
                 let arbitrator = self
                     .extended
                     .arbitrators
                     .get(agreement_id)
-                    .ok_or_else(|| {
-                        BaudError::ArbitratorNotSet(agreement_id.to_hex())
-                    })?;
+                    .ok_or_else(|| BaudError::ArbitratorNotSet(agreement_id.to_hex()))?;
                 if tx.sender != *arbitrator {
                     return Err(BaudError::ArbitratorUnauthorized(
                         "only the assigned arbitrator can resolve".into(),
@@ -863,9 +846,7 @@ impl WorldState {
                 debug!(address = %sender_addr, limit = %auto_approve_limit, "spending policy set");
             }
 
-            TxPayload::CoSignedTransfer {
-                to, amount, ..
-            } => {
+            TxPayload::CoSignedTransfer { to, amount, .. } => {
                 // Same as Transfer but co-signatures already validated.
                 {
                     let sender = self
@@ -1101,9 +1082,7 @@ impl WorldState {
                             .ok_or(BaudError::Overflow)?;
                     }
                     // Check if quorum reached and resolve.
-                    let total_votes = proposal
-                        .votes_for
-                        .saturating_add(proposal.votes_against);
+                    let total_votes = proposal.votes_for.saturating_add(proposal.votes_against);
                     if total_votes >= proposal.quorum {
                         if proposal.votes_for > proposal.votes_against {
                             proposal.status = ProposalStatus::Passed;
@@ -1163,17 +1142,17 @@ impl WorldState {
                     .sub_accounts
                     .get_mut(sub_account_id)
                     .ok_or_else(|| BaudError::SubAccountNotFound(sub_account_id.to_hex()))?;
-                sub.spent = sub
-                    .spent
-                    .checked_add(*amount)
-                    .ok_or(BaudError::Overflow)?;
+                sub.spent = sub.spent.checked_add(*amount).ok_or(BaudError::Overflow)?;
 
                 // Credit recipient.
                 let rec = self
                     .accounts
                     .entry(*to)
                     .or_insert_with(|| Account::new(*to));
-                rec.balance = rec.balance.checked_add(*amount).ok_or(BaudError::Overflow)?;
+                rec.balance = rec
+                    .balance
+                    .checked_add(*amount)
+                    .ok_or(BaudError::Overflow)?;
                 debug!(sub = %sub_account_id, to = %to, amount = %amount, "delegated transfer");
             }
 
