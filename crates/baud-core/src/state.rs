@@ -11,8 +11,8 @@ use crate::error::{BaudError, BaudResult};
 use crate::types::{
     Account, AgentMeta, AgentPricing, AgreementStatus, Amount, Escrow, EscrowStatus, ExtendedState,
     MilestoneEscrow, MilestoneState, Proposal, ProposalStatus, RecurringPayment,
-    RecurringPaymentStatus, ServiceAgreement, SpendingPolicy, SubAccount, Transaction,
-    TxPayload, Vote,
+    RecurringPaymentStatus, ServiceAgreement, SpendingPolicy, SubAccount, Transaction, TxPayload,
+    Vote,
 };
 
 // ─── World State ────────────────────────────────────────────────────────────
@@ -895,11 +895,7 @@ impl WorldState {
             }
 
             TxPayload::RateAgent { target, rating } => {
-                let rep = self
-                    .extended
-                    .reputation
-                    .entry(*target)
-                    .or_default();
+                let rep = self.extended.reputation.entry(*target).or_default();
                 rep.total_score = rep.total_score.saturating_add(*rating as u64);
                 rep.rating_count = rep.rating_count.saturating_add(1);
                 debug!(target = %target, rating = rating, avg = %rep.average_score(), "agent rated");
@@ -996,11 +992,7 @@ impl WorldState {
                 acc.balance = acc.balance.checked_add(amount).ok_or(BaudError::Overflow)?;
 
                 // Update reputation: successful job for provider.
-                let rep = self
-                    .extended
-                    .reputation
-                    .entry(provider)
-                    .or_default();
+                let rep = self.extended.reputation.entry(provider).or_default();
                 rep.successful_jobs = rep.successful_jobs.saturating_add(1);
                 debug!(id = %agreement_id, "service agreement completed, payment released");
             }
@@ -1024,11 +1016,7 @@ impl WorldState {
                 acc.balance = acc.balance.checked_add(amount).ok_or(BaudError::Overflow)?;
 
                 // Update reputation: failed job for provider.
-                let rep = self
-                    .extended
-                    .reputation
-                    .entry(provider)
-                    .or_default();
+                let rep = self.extended.reputation.entry(provider).or_default();
                 rep.failed_jobs = rep.failed_jobs.saturating_add(1);
                 debug!(id = %agreement_id, "service agreement disputed, payment refunded");
             }
