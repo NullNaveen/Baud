@@ -15,3 +15,4 @@ sdk/python/dist/
 .serena/
 Chat_history.litcoffee
 BAUD_COMPLETE_REFERENCE.md
+wallet.json
