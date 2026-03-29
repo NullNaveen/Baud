@@ -7,7 +7,7 @@ use tokio::sync::broadcast;
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
-use baud_api::routes::{build_router, AppState};
+use baud_api::routes::{build_router, record_block_txs, AppState, LotteryState};
 use baud_consensus::{ConsensusConfig, ConsensusEngine};
 use baud_core::crypto::{Address, KeyPair};
 use baud_core::mempool::Mempool;
@@ -175,9 +175,13 @@ async fn main() -> Result<()> {
         start_time: now,
         tx_processed: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         tx_rejected: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        keypair: Some(Arc::clone(&keypair)),
+        faucet_claims: Arc::new(dashmap::DashMap::new()),
+        tx_history: Arc::new(parking_lot::RwLock::new(Vec::new())),
+        lottery: Arc::new(parking_lot::RwLock::new(LotteryState::default())),
     };
 
-    let router = build_router(app_state);
+    let router = build_router(app_state.clone());
     let api_addr = cli.api_addr.clone();
 
     let api_handle = tokio::spawn(async move {
@@ -211,15 +215,25 @@ async fn main() -> Result<()> {
     // ── Log finalized blocks and persist state ─────────────────────────
     let persist_state = Arc::clone(&state);
     let persist_store = Arc::clone(&store);
+    let history_state = app_state.clone();
     let log_handle = tokio::spawn(async move {
         while let Ok(finalized) = finalized_rx.recv().await {
+            let height = finalized.block.header.height;
             info!(
-                height = finalized.block.header.height,
+                height = height,
                 txs = finalized.block.transactions.len(),
                 hash = %finalized.block.header.hash(),
                 votes = finalized.votes.len(),
                 "block finalized"
             );
+            // Record transaction history.
+            if !finalized.block.transactions.is_empty() {
+                record_block_txs(
+                    &history_state,
+                    &finalized.block.transactions,
+                    height,
+                );
+            }
             // Persist state every block.
             let ws = persist_state.read().clone();
             if let Err(e) = persist_store.save_state(&ws) {

@@ -336,6 +336,7 @@ dependencies = [
  "baud-network",
  "baud-storage",
  "clap",
+ "dashmap",
  "futures-util",
  "parking_lot 0.12.5",
  "serde",

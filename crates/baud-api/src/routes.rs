@@ -25,7 +25,9 @@ use axum::response::Html;
 use baud_core::crypto::{Address, Hash, KeyPair, Signature};
 use baud_core::mempool::Mempool;
 use baud_core::state::WorldState;
-use baud_core::types::{AgreementStatus, EscrowStatus, ProposalStatus, Transaction, TxPayload};
+use baud_core::types::{
+    AgreementStatus, EscrowStatus, ProposalStatus, Transaction, TxPayload, QUANTA_PER_BAUD,
+};
 
 static DASHBOARD_HTML: &str = include_str!("../dashboard.html");
 
@@ -40,6 +42,14 @@ pub struct AppState {
     pub start_time: u64,
     pub tx_processed: Arc<AtomicU64>,
     pub tx_rejected: Arc<AtomicU64>,
+    /// Node keypair for server-side signing (faucet, lottery).
+    pub keypair: Option<Arc<KeyPair>>,
+    /// Faucet: set of addresses that already claimed (keyed by address hex).
+    pub faucet_claims: Arc<DashMap<String, u64>>,
+    /// Recent transaction history (most recent first, capped).
+    pub tx_history: Arc<RwLock<Vec<TxHistoryEntry>>>,
+    /// Lottery state.
+    pub lottery: Arc<RwLock<LotteryState>>,
 }
 
 // ─── Request/Response DTOs ──────────────────────────────────────────────────
@@ -239,6 +249,69 @@ pub struct ErrorResponse {
     pub error: String,
 }
 
+// ─── Faucet / History / Lottery Types ───────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct FaucetRequest {
+    pub address: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FaucetResponse {
+    pub tx_hash: String,
+    pub amount_baud: u64,
+    pub message: String,
+}
+
+/// A recorded transaction for history display.
+#[derive(Debug, Clone, Serialize)]
+pub struct TxHistoryEntry {
+    pub hash: String,
+    pub sender: String,
+    pub tx_type: String,
+    pub amount: Option<String>,
+    pub recipient: Option<String>,
+    pub block_height: u64,
+    pub timestamp: u64,
+}
+
+/// On-chain lottery state.
+#[derive(Debug, Clone, Serialize)]
+pub struct LotteryState {
+    pub round: u64,
+    pub entries: Vec<LotteryEntry>,
+    pub pot_quanta: u128,
+    pub draw_block: u64,
+    pub winner: Option<String>,
+    pub status: String,
+}
+
+impl Default for LotteryState {
+    fn default() -> Self {
+        Self {
+            round: 1,
+            entries: Vec::new(),
+            pot_quanta: 0,
+            draw_block: 0,
+            winner: None,
+            status: "open".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LotteryEntry {
+    pub address: String,
+    pub amount_quanta: u128,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LotteryBuyRequest {
+    pub secret: String,
+    pub tickets: u64,
+    pub nonce: u64,
+}
+
 // ─── Rate Limiter ───────────────────────────────────────────────────────────
 
 /// Token-bucket rate limiter keyed by IP address.
@@ -346,6 +419,11 @@ pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Ro
         .route("/v1/proposal/:id", get(get_proposal))
         .route("/v1/agreement/:id", get(get_agreement))
         .route("/v1/sub-account/:id", get(get_sub_account))
+        .route("/v1/faucet", post(faucet))
+        .route("/v1/history", get(get_history))
+        .route("/v1/lottery", get(get_lottery))
+        .route("/v1/lottery/buy", post(lottery_buy))
+        .route("/v1/lottery/draw", post(lottery_draw))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
         .layer(middleware::from_fn_with_state(
             limiter,
@@ -1567,4 +1645,440 @@ async fn get_sub_account(
         )
             .into_response(),
     }
+}
+
+// ─── Faucet ─────────────────────────────────────────────────────────────────
+
+const FAUCET_AMOUNT_BAUD: u64 = 10;
+
+async fn faucet(
+    State(state): State<AppState>,
+    Json(req): Json<FaucetRequest>,
+) -> Result<(StatusCode, Json<FaucetResponse>), (StatusCode, Json<ErrorResponse>)> {
+    let kp = state.keypair.as_ref().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorResponse {
+                error: "faucet not configured on this node".into(),
+            }),
+        )
+    })?;
+
+    let to_addr = Address::from_hex(&req.address).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: format!("invalid address: {e}"),
+            }),
+        )
+    })?;
+
+    // Prevent self-faucet.
+    if to_addr == kp.address() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "cannot faucet to the node's own address".into(),
+            }),
+        ));
+    }
+
+    // Rate limit: one claim per address.
+    if state.faucet_claims.contains_key(&req.address) {
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(ErrorResponse {
+                error: "this address has already claimed from the faucet".into(),
+            }),
+        ));
+    }
+
+    let amount = FAUCET_AMOUNT_BAUD as u128 * QUANTA_PER_BAUD;
+
+    // Get current nonce.
+    let nonce = {
+        let ws = state.world_state.read();
+        ws.get_account(&kp.address()).nonce
+    };
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    let mut tx = Transaction {
+        sender: kp.address(),
+        nonce,
+        payload: TxPayload::Transfer {
+            to: to_addr,
+            amount,
+            memo: Some(b"faucet drop".to_vec()),
+        },
+        timestamp: now,
+        chain_id: state.chain_id.clone(),
+        signature: Signature::zero(),
+    };
+
+    let hash = tx.signable_hash();
+    tx.signature = kp.sign(hash.as_bytes());
+
+    // Validate.
+    {
+        let ws = state.world_state.read();
+        ws.validate_transaction(&tx, now).map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: format!("faucet tx validation failed: {e}"),
+                }),
+            )
+        })?;
+    }
+
+    let tx_hash = state.mempool.add(tx).map_err(|e| {
+        (
+            StatusCode::CONFLICT,
+            Json(ErrorResponse {
+                error: format!("{e}"),
+            }),
+        )
+    })?;
+
+    state.tx_processed.fetch_add(1, Ordering::Relaxed);
+    state.faucet_claims.insert(req.address, now);
+    info!(to = %to_addr.to_hex(), "faucet: sent {} BAUD", FAUCET_AMOUNT_BAUD);
+
+    Ok((
+        StatusCode::OK,
+        Json(FaucetResponse {
+            tx_hash: tx_hash.to_hex(),
+            amount_baud: FAUCET_AMOUNT_BAUD,
+            message: format!("Sent {} BAUD to your address!", FAUCET_AMOUNT_BAUD),
+        }),
+    ))
+}
+
+// ─── Transaction History ────────────────────────────────────────────────────
+
+/// Push a new history entry (called from consensus finalization via `record_block_txs`).
+pub fn record_block_txs(state: &AppState, txs: &[Transaction], block_height: u64) {
+    let mut history = state.tx_history.write();
+    for tx in txs {
+        let (tx_type, amount, recipient) = match &tx.payload {
+            TxPayload::Transfer { to, amount, .. } => {
+                ("Transfer".into(), Some(amount.to_string()), Some(to.to_hex()))
+            }
+            TxPayload::EscrowCreate {
+                recipient, amount, ..
+            } => (
+                "EscrowCreate".into(),
+                Some(amount.to_string()),
+                Some(recipient.to_hex()),
+            ),
+            TxPayload::EscrowRelease { .. } => ("EscrowRelease".into(), None, None),
+            TxPayload::EscrowRefund { .. } => ("EscrowRefund".into(), None, None),
+            TxPayload::AgentRegister { .. } => ("AgentRegister".into(), None, None),
+            TxPayload::BatchTransfer { transfers } => {
+                let total: u128 = transfers.iter().map(|t| t.amount).sum();
+                ("BatchTransfer".into(), Some(total.to_string()), None)
+            }
+            _ => ("Other".into(), None, None),
+        };
+        history.push(TxHistoryEntry {
+            hash: tx.hash().to_hex(),
+            sender: tx.sender.to_hex(),
+            tx_type,
+            amount,
+            recipient,
+            block_height,
+            timestamp: tx.timestamp,
+        });
+    }
+    // Keep only last 500 entries.
+    if history.len() > 500 {
+        let drain = history.len() - 500;
+        history.drain(..drain);
+    }
+}
+
+async fn get_history(State(state): State<AppState>) -> impl IntoResponse {
+    let history = state.tx_history.read();
+    // Return in reverse chronological order.
+    let recent: Vec<&TxHistoryEntry> = history.iter().rev().take(100).collect();
+    Json(serde_json::json!({
+        "count": recent.len(),
+        "transactions": recent,
+    }))
+}
+
+// ─── Lottery ────────────────────────────────────────────────────────────────
+
+const TICKET_PRICE_BAUD: u64 = 1;
+
+async fn get_lottery(State(state): State<AppState>) -> impl IntoResponse {
+    let lottery = state.lottery.read();
+    Json(serde_json::json!({
+        "round": lottery.round,
+        "status": lottery.status,
+        "entries_count": lottery.entries.len(),
+        "pot_baud": lottery.pot_quanta / QUANTA_PER_BAUD,
+        "pot_quanta": lottery.pot_quanta.to_string(),
+        "draw_block": lottery.draw_block,
+        "winner": lottery.winner,
+        "entries": lottery.entries,
+    }))
+}
+
+async fn lottery_buy(
+    State(state): State<AppState>,
+    Json(req): Json<LotteryBuyRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ErrorResponse>)> {
+    let kp_buyer = KeyPair::from_secret_hex(&req.secret).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: format!("invalid secret key: {e}"),
+            }),
+        )
+    })?;
+
+    if req.tickets == 0 || req.tickets > 100 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "tickets must be between 1 and 100".into(),
+            }),
+        ));
+    }
+
+    {
+        let lottery = state.lottery.read();
+        if lottery.status != "open" {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: "lottery is not accepting entries right now".into(),
+                }),
+            ));
+        }
+    }
+
+    let node_kp = state.keypair.as_ref().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorResponse {
+                error: "lottery not available on this node".into(),
+            }),
+        )
+    })?;
+
+    let amount = req.tickets as u128 * TICKET_PRICE_BAUD as u128 * QUANTA_PER_BAUD;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    // Create a transfer from buyer to the node (lottery pot).
+    let mut tx = Transaction {
+        sender: kp_buyer.address(),
+        nonce: req.nonce,
+        payload: TxPayload::Transfer {
+            to: node_kp.address(),
+            amount,
+            memo: Some(format!("lottery:{}tickets", req.tickets).into_bytes()),
+        },
+        timestamp: now,
+        chain_id: state.chain_id.clone(),
+        signature: Signature::zero(),
+    };
+
+    let hash = tx.signable_hash();
+    tx.signature = kp_buyer.sign(hash.as_bytes());
+
+    // Validate.
+    {
+        let ws = state.world_state.read();
+        ws.validate_transaction(&tx, now).map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: format!("lottery entry validation failed: {e}"),
+                }),
+            )
+        })?;
+    }
+
+    let tx_hash = state.mempool.add(tx).map_err(|e| {
+        (
+            StatusCode::CONFLICT,
+            Json(ErrorResponse {
+                error: format!("{e}"),
+            }),
+        )
+    })?;
+
+    state.tx_processed.fetch_add(1, Ordering::Relaxed);
+
+    // Record in lottery state.
+    {
+        let mut lottery = state.lottery.write();
+        for _ in 0..req.tickets {
+            lottery.entries.push(LotteryEntry {
+                address: kp_buyer.address().to_hex(),
+                amount_quanta: TICKET_PRICE_BAUD as u128 * QUANTA_PER_BAUD,
+            });
+        }
+        lottery.pot_quanta += amount;
+        // Set draw block 100 blocks from now if not set.
+        if lottery.draw_block == 0 {
+            let ws = state.world_state.read();
+            lottery.draw_block = ws.height + 100;
+        }
+    }
+
+    info!(buyer = %kp_buyer.address().to_hex(), tickets = req.tickets, "lottery: tickets purchased");
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "tx_hash": tx_hash.to_hex(),
+            "tickets": req.tickets,
+            "cost_baud": req.tickets as u64 * TICKET_PRICE_BAUD,
+            "message": format!("Purchased {} lottery ticket(s)!", req.tickets),
+        })),
+    ))
+}
+
+async fn lottery_draw(
+    State(state): State<AppState>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ErrorResponse>)> {
+    let node_kp = state.keypair.as_ref().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorResponse {
+                error: "lottery not available on this node".into(),
+            }),
+        )
+    })?;
+
+    let (winner_addr, pot, round) = {
+        let mut lottery = state.lottery.write();
+        if lottery.entries.is_empty() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: "no entries in the lottery".into(),
+                }),
+            ));
+        }
+
+        let ws = state.world_state.read();
+        if lottery.draw_block > 0 && ws.height < lottery.draw_block {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: format!(
+                        "draw block not reached yet (current: {}, draw: {})",
+                        ws.height, lottery.draw_block
+                    ),
+                }),
+            ));
+        }
+
+        // Use the last block hash as randomness source.
+        let hash_bytes = ws.last_block_hash.as_bytes();
+        let idx_bytes = [hash_bytes[0], hash_bytes[1], hash_bytes[2], hash_bytes[3]];
+        let random_idx = u32::from_le_bytes(idx_bytes) as usize % lottery.entries.len();
+        let winner = lottery.entries[random_idx].address.clone();
+
+        lottery.winner = Some(winner.clone());
+        lottery.status = "drawn".into();
+
+        let pot = lottery.pot_quanta;
+        let round = lottery.round;
+        (winner, pot, round)
+    };
+
+    // Send pot to winner (minus node keeps nothing — fully fair).
+    let nonce = {
+        let ws = state.world_state.read();
+        ws.get_account(&node_kp.address()).nonce
+    };
+
+    let winner_address = Address::from_hex(&winner_addr).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("invalid winner address: {e}"),
+            }),
+        )
+    })?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    let mut tx = Transaction {
+        sender: node_kp.address(),
+        nonce,
+        payload: TxPayload::Transfer {
+            to: winner_address,
+            amount: pot,
+            memo: Some(format!("lottery round {} winner!", round).into_bytes()),
+        },
+        timestamp: now,
+        chain_id: state.chain_id.clone(),
+        signature: Signature::zero(),
+    };
+
+    let hash = tx.signable_hash();
+    tx.signature = node_kp.sign(hash.as_bytes());
+
+    {
+        let ws = state.world_state.read();
+        ws.validate_transaction(&tx, now).map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: format!("lottery payout failed: {e}"),
+                }),
+            )
+        })?;
+    }
+
+    let tx_hash = state.mempool.add(tx).map_err(|e| {
+        (
+            StatusCode::CONFLICT,
+            Json(ErrorResponse {
+                error: format!("{e}"),
+            }),
+        )
+    })?;
+
+    state.tx_processed.fetch_add(1, Ordering::Relaxed);
+
+    // Reset lottery for next round.
+    {
+        let mut lottery = state.lottery.write();
+        let next_round = lottery.round + 1;
+        *lottery = LotteryState {
+            round: next_round,
+            ..LotteryState::default()
+        };
+    }
+
+    info!(winner = %winner_addr, pot_baud = pot / QUANTA_PER_BAUD, "lottery round {} drawn!", round);
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "round": round,
+            "winner": winner_addr,
+            "pot_baud": pot / QUANTA_PER_BAUD,
+            "payout_tx": tx_hash.to_hex(),
+            "message": format!("Round {} winner: {}!", round, &winner_addr[..16]),
+        })),
+    ))
 }

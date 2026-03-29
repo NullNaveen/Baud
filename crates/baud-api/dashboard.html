@@ -268,6 +268,22 @@ tr:hover td{background:var(--card-hover)}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Agents
     </a>
+    <a href="#faucet" data-page="faucet">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6M12 22v-6M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M22 12h-6M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24"/></svg>
+      Faucet
+    </a>
+    <a href="#trade" data-page="trade">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      Trade
+    </a>
+    <a href="#lottery" data-page="lottery">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8l-4 4-4-4"/><path d="M8 16l4-4 4 4"/></svg>
+      Lottery
+    </a>
+    <a href="#history" data-page="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      History
+    </a>
     <a href="#help" data-page="help">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       Help
@@ -296,6 +312,7 @@ tr:hover td{background:var(--card-hover)}
 // ─── State ──────────────────────────────────────────────────────────────────
 const S = {
   status: null, mining: null, mempool: null, health: null, myAccount: null,
+  history: null, lottery: null,
   lastUpdate: 0, connected: false, page: 'dashboard',
 };
 const API = location.origin;
@@ -377,6 +394,14 @@ async function refreshData() {
     S.myAccount = await fetchJSON('/v1/account/' + status.node_address);
   }
 
+  // Fetch history and lottery if on those pages
+  if (S.page === 'faucet' || S.page === 'trade' || S.page === 'dashboard') {
+    S.history = await fetchJSON('/v1/history');
+  }
+  if (S.page === 'lottery') {
+    S.lottery = await fetchJSON('/v1/lottery');
+  }
+
   const dot = $('#status-dot');
   const txt = $('#node-status-text');
   if (S.connected) {
@@ -438,6 +463,9 @@ function renderPage() {
     case 'node': c.innerHTML = renderNode(); break;
     case 'explorer': c.innerHTML = renderExplorer(); break;
     case 'agents': c.innerHTML = renderAgents(); break;
+    case 'faucet': c.innerHTML = renderFaucet(); break;
+    case 'trade': c.innerHTML = renderTrade(); break;
+    case 'lottery': c.innerHTML = renderLottery(); break;
     case 'help': c.innerHTML = renderHelp(); break;
     default: c.innerHTML = renderDashboard();
   }
@@ -465,7 +493,8 @@ function updateLiveData() {
     case 'mining': updateMining(); break;
     case 'mempool': updateMempool(); break;
     case 'node': updateNode(); break;
-    // wallet, send, help, agents, explorer are static forms — no update needed
+    case 'lottery': updateLottery(); break;
+    // wallet, send, help, agents, explorer, faucet, trade are static forms — no update needed
   }
 }
 
@@ -1492,6 +1521,298 @@ async function submitAgentRegister() {
   } catch(e) { el.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`; }
 }
 
+// ── Faucet ──
+function renderFaucet() {
+  return `<div class="page">
+    <div class="page-header"><h1>BAUD Faucet</h1><p>Get free BAUD to try out the network</p></div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">Request BAUD</div>
+      <p style="color:var(--text2);margin-bottom:16px;line-height:1.6">
+        Enter your BAUD address below to receive <strong style="color:var(--primary)">10 BAUD</strong> for free.
+        Rate limited to <strong>1 request per address per hour</strong>.
+      </p>
+      <div style="display:flex;gap:12px;align-items:end">
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <label>Your BAUD Address</label>
+          <input type="text" id="faucet-address" placeholder="Enter your hex-encoded address" class="mono"
+                 onkeydown="if(event.key==='Enter')requestFaucet()">
+        </div>
+        <button class="btn btn-primary" onclick="requestFaucet()" style="margin-bottom:0;height:42px">
+          Request 10 BAUD
+        </button>
+      </div>
+      <div id="faucet-result" style="margin-top:16px"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">How It Works</div>
+      <div class="inline-grid" style="gap:16px">
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--primary)">
+          <strong style="color:var(--primary)">1. Enter Address</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Paste your BAUD address from the Wallet page. Don't have one? Generate a keypair on the <a href="#wallet" onclick="navigate('wallet')" style="color:var(--primary)">Wallet</a> page.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--green)">
+          <strong style="color:var(--green)">2. Receive BAUD</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">The faucet sends 10 BAUD to your address instantly. The transaction is signed by the node and added to the mempool.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--gold)">
+          <strong style="color:var(--gold)">3. Start Using</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Use your BAUD to send transfers, create escrows, register agents, or enter the lottery!</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Recent Transactions</div>
+      <div id="faucet-history" style="font-size:.9em;color:var(--text2)">
+        ${renderHistoryTable()}
+      </div>
+    </div>
+  </div>`;
+}
+
+async function requestFaucet() {
+  const address = document.getElementById('faucet-address').value.trim();
+  const el = document.getElementById('faucet-result');
+  if (!address) { el.innerHTML = '<div class="alert alert-error">Please enter your BAUD address</div>'; return; }
+  if (!/^[0-9a-fA-F]{64}$/.test(address)) { el.innerHTML = '<div class="alert alert-error">Invalid address. Must be a 64-character hex string.</div>'; return; }
+
+  el.innerHTML = '<div class="alert alert-info">Requesting BAUD…</div>';
+  try {
+    const resp = await fetch(API + '/v1/faucet', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ address })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      el.innerHTML = `<div class="alert alert-success">Sent 10 BAUD to your address!<br><span class="mono" style="font-size:.85em">${escapeHtml(data.tx_hash || data.message || 'Success')}</span></div>`;
+    } else {
+      el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error || 'Request failed')}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">Network error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderHistoryTable() {
+  if (!S.history || !S.history.length) return '<p>No recent transactions yet.</p>';
+  const rows = S.history.slice(0, 20).map(tx => `
+    <tr>
+      <td style="font-size:.85em;color:var(--text2)">${tx.block_height ? '#'+fmt(tx.block_height) : '—'}</td>
+      <td><span class="badge" style="background:var(--primary);color:#fff;font-size:.75em">${escapeHtml(tx.tx_type || 'Transfer')}</span></td>
+      <td class="mono" style="font-size:.8em;cursor:pointer" onclick="copyText('${tx.from}')" title="${tx.from}">${shortAddr(tx.from)}</td>
+      <td style="text-align:center;color:var(--text2)">→</td>
+      <td class="mono" style="font-size:.8em;cursor:pointer" onclick="copyText('${tx.to}')" title="${tx.to}">${shortAddr(tx.to)}</td>
+      <td style="text-align:right;font-weight:600">${tx.amount ? fmtBaud(tx.amount) : '—'}</td>
+    </tr>`).join('');
+  return `<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="border-bottom:1px solid var(--border);text-align:left">
+      <th style="padding:8px 6px;font-size:.8em;color:var(--text2)">Block</th>
+      <th style="padding:8px 6px;font-size:.8em;color:var(--text2)">Type</th>
+      <th style="padding:8px 6px;font-size:.8em;color:var(--text2)">From</th>
+      <th></th>
+      <th style="padding:8px 6px;font-size:.8em;color:var(--text2)">To</th>
+      <th style="padding:8px 6px;font-size:.8em;color:var(--text2);text-align:right">Amount</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ── Trade ──
+function renderTrade() {
+  return `<div class="page">
+    <div class="page-header"><h1>P2P Trading</h1><p>Trade BAUD directly with other holders using trustless escrow</p></div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">How P2P Trading Works</div>
+      <p style="color:var(--text2);line-height:1.7;margin-bottom:16px">
+        Baud has <strong>built-in escrow</strong> that enables trustless P2P trading. No middleman, no exchange account needed.
+        Either the trade completes or your funds are automatically returned.
+      </p>
+      <div class="inline-grid" style="gap:16px">
+        <div style="padding:16px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--primary)">
+          <strong style="color:var(--primary)">Step 1: Agree on Terms</strong>
+          <p style="color:var(--text2);margin-top:6px;line-height:1.5">
+            Contact the other party and agree on the trade amount and price. Share your BAUD address.
+          </p>
+        </div>
+        <div style="padding:16px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--gold)">
+          <strong style="color:var(--gold)">Step 2: Create Escrow</strong>
+          <p style="color:var(--text2);margin-top:6px;line-height:1.5">
+            The seller creates an escrow on the <a href="#send" onclick="navigate('send')" style="color:var(--primary)">Send</a> page (Escrow tab).
+            BAUD is locked with a hash lock and a deadline.
+          </p>
+        </div>
+        <div style="padding:16px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--green)">
+          <strong style="color:var(--green)">Step 3: Buyer Pays</strong>
+          <p style="color:var(--text2);margin-top:6px;line-height:1.5">
+            The buyer sends external payment (e.g., fiat, other crypto). Once the seller confirms receipt,
+            they reveal the preimage to release the escrow.
+          </p>
+        </div>
+        <div style="padding:16px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--cyan)">
+          <strong style="color:var(--cyan)">Step 4: Complete or Refund</strong>
+          <p style="color:var(--text2);margin-top:6px;line-height:1.5">
+            Buyer reveals the preimage on <a href="#explorer" onclick="navigate('explorer')" style="color:var(--primary)">Explorer</a> to claim the BAUD.
+            If the deadline passes, the seller gets an automatic refund.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">Network Stats</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+        <div class="stat-card">
+          <div class="stat-label">Total Supply</div>
+          <div class="stat-value">1,000,000,000</div>
+          <div class="stat-label">BAUD</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Mined</div>
+          <div class="stat-value" id="trade-mined">${S.mining ? parseFloat(S.mining.percent_mined).toFixed(2) + '%' : '—'}</div>
+          <div class="stat-label">of total supply</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Block Reward</div>
+          <div class="stat-value" id="trade-reward">${S.mining ? fmt(S.mining.current_block_reward_baud) : '—'}</div>
+          <div class="stat-label">BAUD/block</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Block Height</div>
+          <div class="stat-value" id="trade-height">${S.status ? fmt(S.status.height) : '—'}</div>
+          <div class="stat-label">blocks</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Quick Links</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a href="#send" onclick="navigate('send')" class="btn btn-primary" style="text-decoration:none">Create Escrow</a>
+        <a href="#explorer" onclick="navigate('explorer')" class="btn" style="text-decoration:none;background:var(--bg);border:1px solid var(--border);color:var(--text)">Find Escrow</a>
+        <a href="#wallet" onclick="navigate('wallet')" class="btn" style="text-decoration:none;background:var(--bg);border:1px solid var(--border);color:var(--text)">Generate Wallet</a>
+        <a href="#faucet" onclick="navigate('faucet')" class="btn" style="text-decoration:none;background:var(--bg);border:1px solid var(--border);color:var(--text)">Get Free BAUD</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Lottery ──
+function renderLottery() {
+  const lot = S.lottery || {};
+  const potBaud = lot.pot ? fmtBaud(String(lot.pot)) : '0';
+  const entriesCount = lot.entries ? lot.entries.length : 0;
+  const isActive = lot.active !== false;
+
+  return `<div class="page">
+    <div class="page-header"><h1>BAUD Lottery</h1><p>Enter for a chance to win the pot — 1 BAUD per entry</p></div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">Current Round ${lot.round ? '#' + lot.round : ''}</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+        <div class="stat-card">
+          <div class="stat-label">Prize Pot</div>
+          <div class="stat-value" id="lot-pot" style="color:var(--gold)">${potBaud}</div>
+          <div class="stat-label">BAUD</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Entries</div>
+          <div class="stat-value" id="lot-entries">${entriesCount}</div>
+          <div class="stat-label">of 10 needed to draw</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Entry Fee</div>
+          <div class="stat-value">1</div>
+          <div class="stat-label">BAUD</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Status</div>
+          <div class="stat-value" style="color:${isActive ? 'var(--green)' : 'var(--red)'}">${isActive ? 'Open' : 'Closed'}</div>
+          <div class="stat-label">${isActive ? 'Accepting entries' : 'Drawing soon'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">Enter Lottery</div>
+      <p style="color:var(--text2);margin-bottom:16px;line-height:1.6">
+        Enter the lottery by paying <strong>1 BAUD</strong> entry fee. When <strong>10 entries</strong> accumulate, 
+        a winner is drawn using the next block hash as randomness. The winner takes the entire pot!
+      </p>
+      <div style="display:flex;gap:12px;align-items:end">
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <label>Your BAUD Address</label>
+          <input type="text" id="lottery-address" placeholder="Enter your hex-encoded address" class="mono"
+                 onkeydown="if(event.key==='Enter')enterLottery()">
+        </div>
+        <button class="btn btn-primary" onclick="enterLottery()" style="margin-bottom:0;height:42px">
+          Enter (1 BAUD)
+        </button>
+      </div>
+      <div id="lottery-result" style="margin-top:16px"></div>
+    </div>
+
+    ${lot.last_winner ? `
+    <div class="card" style="margin-bottom:20px;border-left:3px solid var(--gold)">
+      <div class="section-title" style="color:var(--gold)">Last Winner</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+        <div>
+          <div class="mono" style="font-size:.9em;cursor:pointer" onclick="copyText('${lot.last_winner}')" title="${lot.last_winner}">
+            ${shortAddr(lot.last_winner)}
+          </div>
+        </div>
+        <div style="font-size:1.3em;font-weight:700;color:var(--gold)">
+          Won ${lot.last_prize ? fmtBaud(String(lot.last_prize)) : '?'} BAUD
+        </div>
+      </div>
+    </div>` : ''}
+
+    <div class="card">
+      <div class="section-title">Current Entries</div>
+      <div id="lot-entry-list" style="font-size:.9em">
+        ${entriesCount > 0 ? lot.entries.map((addr, i) => `
+          <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+            <span style="color:var(--text2);font-size:.85em">#${i+1}</span>
+            <span class="mono" style="font-size:.85em;cursor:pointer" onclick="copyText('${addr}')" title="${addr}">${shortAddr(addr)}</span>
+          </div>
+        `).join('') : '<p style="color:var(--text2)">No entries yet. Be the first!</p>'}
+      </div>
+    </div>
+  </div>`;
+}
+
+function updateLottery() {
+  const lot = S.lottery || {};
+  _set('lot-pot', lot.pot ? fmtBaud(String(lot.pot)) : '0');
+  _set('lot-entries', lot.entries ? lot.entries.length : 0);
+}
+
+async function enterLottery() {
+  const address = document.getElementById('lottery-address').value.trim();
+  const el = document.getElementById('lottery-result');
+  if (!address) { el.innerHTML = '<div class="alert alert-error">Please enter your BAUD address</div>'; return; }
+  if (!/^[0-9a-fA-F]{64}$/.test(address)) { el.innerHTML = '<div class="alert alert-error">Invalid address. Must be a 64-character hex string.</div>'; return; }
+
+  el.innerHTML = '<div class="alert alert-info">Entering lottery…</div>';
+  try {
+    const resp = await fetch(API + '/v1/lottery/enter', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ address })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      el.innerHTML = `<div class="alert alert-success">${escapeHtml(data.message || 'Entry accepted!')}</div>`;
+      S.lottery = await fetchJSON('/v1/lottery');
+      renderPage();
+    } else {
+      el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error || 'Entry failed')}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">Network error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
 // ── Help ──
 function renderHelp() {
   return `<div class="page">
@@ -1546,6 +1867,18 @@ function renderHelp() {
         <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--gold)">
           <strong style="color:var(--gold)">Agents</strong>
           <p style="color:var(--text2);margin-top:4px;line-height:1.5">Register your AI agent on the network with a name, endpoint URL, and capabilities. Makes your agent discoverable for M2M payments.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--cyan)">
+          <strong style="color:var(--cyan)">Faucet</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Get 10 free BAUD to try out the network. Rate limited to 1 request per address per hour.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--orange)">
+          <strong style="color:var(--orange)">Trade</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Learn how to trade BAUD peer-to-peer using trustless escrow. Step-by-step guide and quick links.</p>
+        </div>
+        <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--gold)">
+          <strong style="color:var(--gold)">Lottery</strong>
+          <p style="color:var(--text2);margin-top:4px;line-height:1.5">Enter the on-chain lottery for 1 BAUD per entry. Winner drawn using block hash when 10 entries accumulate.</p>
         </div>
         <div style="padding:14px;background:var(--bg);border-radius:var(--radius-sm);border-left:3px solid var(--red)">
           <strong style="color:var(--red)">Help</strong>

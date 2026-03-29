@@ -22,5 +22,6 @@ serde_json.workspace = true
 clap.workspace = true
 anyhow.workspace = true
 parking_lot.workspace = true
+dashmap.workspace = true
 futures-util.workspace = true
 axum.workspace = true
