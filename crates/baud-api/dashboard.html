@@ -11,19 +11,21 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0b0b1a;--bg2:#10102a;--card:#141432;--card-hover:#1a1a3e;
-  --border:#1e1e44;--text:#e8e8f4;--text2:#a0a0b8;--text3:#666680;
-  --primary:#8b5cf6;--primary-light:#a78bfa;--cyan:#06b6d4;--green:#22c55e;
-  --red:#ef4444;--gold:#f5a623;--orange:#f97316;
-  --sidebar-w:240px;--radius:12px;--radius-sm:8px;
+  --bg:#0a0a1a;--bg2:#0f172a;--card:#141432;--card-hover:#1a1a3e;
+  --border:#1e293b;--text:#e8e8f4;--text2:#a0a0b8;--text3:#666680;
+  --primary:#00d4aa;--primary-light:#00e6b8;--cyan:#6366f1;--green:#22c55e;
+  --red:#ef4444;--gold:#f59e0b;--orange:#f97316;
+  --sidebar-w:260px;--radius:12px;--radius-sm:8px;
   --shadow:0 4px 24px rgba(0,0,0,.4);
-  --gradient:linear-gradient(135deg,#7c3aed,#06b6d4);
+  --gradient:linear-gradient(135deg,#00d4aa,#6366f1);
+  --glass-bg:rgba(15,23,42,.6);--glass-border:rgba(0,212,170,.1);
 }
 [data-theme="light"]{
   --bg:#f4f4f8;--bg2:#eaeaf0;--card:#ffffff;--card-hover:#f8f8fc;
   --border:#d0d0dc;--text:#111128;--text2:#44445e;--text3:#77778e;
   --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
-  --primary:#7c3aed;--primary-light:#6d28d9;
+  --primary:#00b894;--primary-light:#00a383;
+  --glass-bg:rgba(255,255,255,.8);--glass-border:rgba(0,184,148,.15);
 }
 [data-theme="light"] .card{box-shadow:var(--shadow)}
 [data-theme="light"] #sidebar{box-shadow:1px 0 8px rgba(0,0,0,.04)}
@@ -217,6 +219,37 @@ tr:hover td{background:var(--card-hover)}
 /* Mining animation */
 @keyframes pulse-glow{0%,100%{box-shadow:0 0 8px var(--green)}50%{box-shadow:0 0 20px var(--green)}}
 .mining-active{animation:pulse-glow 2s infinite}
+
+/* Glassmorphism card */
+.glass-card{background:var(--glass-bg);backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-radius:var(--radius);padding:20px;transition:border-color .2s}
+.glass-card:hover{border-color:rgba(0,212,170,.3)}
+.glass-stat{text-align:center;padding:24px 16px}
+.glass-stat .stat-value{font-family:'Space Grotesk','DM Sans',sans-serif;font-size:1.8em;font-weight:700;margin:8px 0 4px;color:var(--primary);font-variant-numeric:tabular-nums}
+.glass-stat .stat-label{color:var(--text2);font-size:.82em;text-transform:uppercase;letter-spacing:.08em;font-weight:500}
+
+/* Service/marketplace cards */
+.service-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:24px}
+.service-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:all .2s}
+.service-card:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.service-card .price{font-family:'Space Grotesk',sans-serif;font-size:1.3em;font-weight:700;color:var(--primary)}
+.service-card .category{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.72em;font-weight:600;background:rgba(0,212,170,.1);color:var(--primary)}
+
+/* Order book */
+.order-book{display:grid;grid-template-columns:1fr 1fr;gap:0;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)}
+.order-book .bids,.order-book .asks{padding:0}
+.order-book .bids{background:rgba(34,197,94,.03)}
+.order-book .asks{background:rgba(239,68,68,.03)}
+.order-row{display:flex;justify-content:space-between;padding:6px 12px;font-size:.85em;font-family:'JetBrains Mono',monospace}
+.order-row:hover{background:rgba(255,255,255,.03)}
+.order-row .price-bid{color:var(--green)}
+.order-row .price-ask{color:var(--red)}
+
+/* Proposal card */
+.proposal-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:12px;transition:border-color .2s}
+.proposal-card:hover{border-color:var(--primary)}
+.proposal-card .votes-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--border);margin-top:12px}
+.proposal-card .votes-for{background:var(--green);height:100%}
+.proposal-card .votes-against{background:var(--red);height:100%}
 </style>
 </head>
 <body>
@@ -284,6 +317,18 @@ tr:hover td{background:var(--card-hover)}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       History
     </a>
+    <a href="#marketplace" data-page="marketplace">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Marketplace
+    </a>
+    <a href="#governance" data-page="governance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Governance
+    </a>
+    <a href="#exchange" data-page="exchange">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+      Exchange
+    </a>
     <a href="#help" data-page="help">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       Help
@@ -312,7 +357,7 @@ tr:hover td{background:var(--card-hover)}
 // ─── State ──────────────────────────────────────────────────────────────────
 const S = {
   status: null, mining: null, mempool: null, health: null, myAccount: null,
-  history: null, lottery: null,
+  history: null, lottery: null, marketplace: null, proposals: null, orderbook: null,
   lastUpdate: 0, connected: false, page: 'dashboard',
 };
 const API = location.origin;
@@ -395,11 +440,21 @@ async function refreshData() {
   }
 
   // Fetch history and lottery if on those pages
-  if (S.page === 'faucet' || S.page === 'trade' || S.page === 'dashboard') {
-    S.history = await fetchJSON('/v1/history');
+  if (S.page === 'faucet' || S.page === 'trade' || S.page === 'dashboard' || S.page === 'history') {
+    const histData = await fetchJSON('/v1/history');
+    S.history = histData ? histData.transactions : [];
   }
   if (S.page === 'lottery') {
     S.lottery = await fetchJSON('/v1/lottery');
+  }
+  if (S.page === 'marketplace') {
+    S.marketplace = await fetchJSON('/v1/marketplace') || [];
+  }
+  if (S.page === 'governance') {
+    S.proposals = await fetchJSON('/v1/proposals') || [];
+  }
+  if (S.page === 'exchange') {
+    S.orderbook = await fetchJSON('/v1/exchange/orderbook') || { bids: [], asks: [] };
   }
 
   const dot = $('#status-dot');
@@ -466,6 +521,10 @@ function renderPage() {
     case 'faucet': c.innerHTML = renderFaucet(); break;
     case 'trade': c.innerHTML = renderTrade(); break;
     case 'lottery': c.innerHTML = renderLottery(); break;
+    case 'history': c.innerHTML = renderHistory(); break;
+    case 'marketplace': c.innerHTML = renderMarketplace(); break;
+    case 'governance': c.innerHTML = renderGovernance(); break;
+    case 'exchange': c.innerHTML = renderExchange(); break;
     case 'help': c.innerHTML = renderHelp(); break;
     default: c.innerHTML = renderDashboard();
   }
@@ -494,6 +553,10 @@ function updateLiveData() {
     case 'mempool': updateMempool(); break;
     case 'node': updateNode(); break;
     case 'lottery': updateLottery(); break;
+    case 'history': updateHistory(); break;
+    case 'marketplace': updateMarketplace(); break;
+    case 'governance': updateGovernance(); break;
+    case 'exchange': updateExchange(); break;
     // wallet, send, help, agents, explorer, faucet, trade are static forms — no update needed
   }
 }
@@ -1594,28 +1657,64 @@ async function requestFaucet() {
   }
 }
 
-function renderHistoryTable() {
-  if (!S.history || !S.history.length) return '<p>No recent transactions yet.</p>';
-  const rows = S.history.slice(0, 20).map(tx => `
-    <tr>
-      <td style="font-size:.85em;color:var(--text2)">${tx.block_height ? '#'+fmt(tx.block_height) : '—'}</td>
-      <td><span class="badge" style="background:var(--primary);color:#fff;font-size:.75em">${escapeHtml(tx.tx_type || 'Transfer')}</span></td>
-      <td class="mono" style="font-size:.8em;cursor:pointer" onclick="copyText('${tx.from}')" title="${tx.from}">${shortAddr(tx.from)}</td>
-      <td style="text-align:center;color:var(--text2)">→</td>
-      <td class="mono" style="font-size:.8em;cursor:pointer" onclick="copyText('${tx.to}')" title="${tx.to}">${shortAddr(tx.to)}</td>
-      <td style="text-align:right;font-weight:600">${tx.amount ? fmtBaud(tx.amount) : '—'}</td>
-    </tr>`).join('');
+function renderHistoryTable(limit) {
+  const txs = S.history || [];
+  if (!txs.length) return '<p style="color:var(--text2)">No recent transactions yet.</p>';
+  const rows = txs.slice(0, limit || 20).map(tx => {
+    const sender = tx.sender || '';
+    const recipient = tx.recipient || '';
+    return `
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 6px;font-size:.85em;color:var(--text2)">${tx.block_height ? '#'+fmt(tx.block_height) : '—'}</td>
+      <td style="padding:8px 6px"><span class="badge" style="background:var(--primary);color:#fff;font-size:.75em;padding:2px 8px;border-radius:4px">${escapeHtml(tx.tx_type || 'Transfer')}</span></td>
+      <td class="mono" style="padding:8px 6px;font-size:.8em;cursor:pointer" onclick="copyText('${sender}')" title="${sender}">${shortAddr(sender)}</td>
+      <td style="padding:8px 6px;text-align:center;color:var(--text2)">→</td>
+      <td class="mono" style="padding:8px 6px;font-size:.8em;cursor:pointer" onclick="copyText('${recipient}')" title="${recipient}">${shortAddr(recipient)}</td>
+      <td style="padding:8px 6px;text-align:right;font-weight:600">${tx.amount ? fmtBaud(tx.amount) : '—'}</td>
+      <td class="mono" style="padding:8px 6px;font-size:.75em;color:var(--text2);cursor:pointer" onclick="copyText('${tx.hash || ''}')" title="${tx.hash || ''}">${tx.hash ? shortAddr(tx.hash) : '—'}</td>
+    </tr>`;
+  }).join('');
   return `<table style="width:100%;border-collapse:collapse">
-    <thead><tr style="border-bottom:1px solid var(--border);text-align:left">
+    <thead><tr style="border-bottom:2px solid var(--border);text-align:left">
       <th style="padding:8px 6px;font-size:.8em;color:var(--text2)">Block</th>
       <th style="padding:8px 6px;font-size:.8em;color:var(--text2)">Type</th>
       <th style="padding:8px 6px;font-size:.8em;color:var(--text2)">From</th>
       <th></th>
       <th style="padding:8px 6px;font-size:.8em;color:var(--text2)">To</th>
       <th style="padding:8px 6px;font-size:.8em;color:var(--text2);text-align:right">Amount</th>
+      <th style="padding:8px 6px;font-size:.8em;color:var(--text2)">Tx Hash</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
+}
+
+// ── History ──
+function renderHistory() {
+  const txs = S.history || [];
+  const totalCount = txs.length;
+  return `<div class="page">
+    <div class="page-header"><h1>Transaction History</h1><p>Recent transactions recorded on the blockchain</p></div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="section-title" style="margin-bottom:0">Recent Transactions</div>
+        <div style="font-size:.9em;color:var(--text2)">${totalCount} transaction${totalCount !== 1 ? 's' : ''} recorded</div>
+      </div>
+      <div id="history-table">
+        ${renderHistoryTable(100)}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">About Transaction History</div>
+      <div style="color:var(--text2);line-height:1.7;font-size:.93em">
+        <p>This page shows the most recent transactions that have been finalized on the blockchain.
+        Transactions are recorded when blocks are finalized by the consensus engine.</p>
+        <p style="margin-top:8px"><strong>Transaction types include:</strong> Transfer, Faucet, Lottery Entry, Escrow, Agent Registration, and more.</p>
+        <p style="margin-top:8px">Click any address or hash to copy it to your clipboard.</p>
+      </div>
+    </div>
+  </div>`;
 }
 
 // ── Trade ──
@@ -1788,6 +1887,10 @@ function updateLottery() {
   _set('lot-entries', lot.entries ? lot.entries.length : 0);
 }
 
+function updateHistory() {
+  _setHTML('history-table', renderHistoryTable(100));
+}
+
 async function enterLottery() {
   const address = document.getElementById('lottery-address').value.trim();
   const el = document.getElementById('lottery-result');
@@ -1811,6 +1914,452 @@ async function enterLottery() {
   } catch(e) {
     el.innerHTML = `<div class="alert alert-error">Network error: ${escapeHtml(e.message)}</div>`;
   }
+}
+
+// ── Marketplace ──
+function renderMarketplace() {
+  const agents = S.marketplace || [];
+  const categories = ['All', 'Data Analysis', 'Content Generation', 'Code Review', 'Translation', 'Automation'];
+  return `<div class="page">
+    <div class="page-header">
+      <h1>Marketplace</h1>
+      <p>Browse and list AI agent services — pay with BAUD</p>
+    </div>
+
+    <div class="cards-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:20px">
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--primary)">${agents.length}</div><div class="stat-label">Active Agents</div></div>
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--cyan)">${agents.filter(a => a.capabilities && a.capabilities.length > 0).length}</div><div class="stat-label">Services Listed</div></div>
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--gold)">${agents.reduce((sum, a) => sum + (a.rating_count || 0), 0)}</div><div class="stat-label">Total Ratings</div></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+      ${categories.map(c => `<button class="btn btn-sm ${c === 'All' ? 'btn-primary' : 'btn-secondary'}" onclick="filterMarketplace('${escapeHtml(c)}')">${escapeHtml(c)}</button>`).join('')}
+    </div>
+
+    <div id="marketplace-grid" class="service-grid">
+      ${agents.length === 0 ? renderEmptyMarketplace() : agents.map(a => renderAgentCard(a)).join('')}
+    </div>
+
+    <div class="card" style="margin-top:24px">
+      <div class="section-title">Register Your Agent</div>
+      <p style="color:var(--text2);margin-bottom:16px">List your AI agent on the marketplace so other machines can pay for your services with BAUD.</p>
+      <div class="two-col">
+        <div>
+          <div class="form-group"><label>Secret Key</label><input type="password" id="mp-secret" placeholder="Your wallet secret key"></div>
+          <div class="form-group"><label>Agent Name</label><input id="mp-name" placeholder="e.g. DataSenseAI"></div>
+          <div class="form-group"><label>Endpoint URL</label><input id="mp-endpoint" placeholder="https://api.youragent.com"></div>
+        </div>
+        <div>
+          <div class="form-group"><label>Capabilities (comma-separated)</label><input id="mp-caps" placeholder="data-analysis, forecasting, NLP"></div>
+          <div class="form-group"><label>Price Per Request (BAUD)</label><input type="number" id="mp-price" placeholder="0.5" step="0.01"></div>
+          <div class="form-group"><label>Nonce</label><input type="number" id="mp-nonce" placeholder="0"></div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="registerAgent()" style="margin-top:8px">Register Agent</button>
+      <div id="mp-result" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <div class="section-title">Update Pricing</div>
+      <p style="color:var(--text2);margin-bottom:16px">Set your service pricing and SLA description.</p>
+      <div class="two-col">
+        <div>
+          <div class="form-group"><label>Secret Key</label><input type="password" id="price-secret" placeholder="Your wallet secret key"></div>
+          <div class="form-group"><label>Price Per Request (BAUD)</label><input type="number" id="price-amount" placeholder="1.0" step="0.01"></div>
+        </div>
+        <div>
+          <div class="form-group"><label>Billing Model</label><input id="price-model" placeholder="per-request, hourly, subscription"></div>
+          <div class="form-group"><label>SLA Description</label><input id="price-sla" placeholder="99.9% uptime, &lt;500ms response"></div>
+        </div>
+      </div>
+      <div class="form-group"><label>Nonce</label><input type="number" id="price-nonce" placeholder="0" style="max-width:200px"></div>
+      <button class="btn btn-primary" onclick="updatePricing()" style="margin-top:8px">Update Pricing</button>
+      <div id="price-result" style="margin-top:12px"></div>
+    </div>
+  </div>`;
+}
+
+function renderEmptyMarketplace() {
+  return `<div class="card" style="grid-column:1/-1;text-align:center;padding:48px">
+    <div style="font-size:2em;margin-bottom:12px">🤖</div>
+    <h3 style="margin-bottom:8px">No Agents Listed Yet</h3>
+    <p style="color:var(--text2)">Be the first to register your AI agent on the Baud marketplace!</p>
+  </div>`;
+}
+
+function renderAgentCard(a) {
+  const caps = a.capabilities || [];
+  const rating = a.avg_rating ? '★'.repeat(Math.round(a.avg_rating)) + '☆'.repeat(5 - Math.round(a.avg_rating)) : '—';
+  return `<div class="service-card">
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
+      <div>
+        <strong style="font-size:1.05em">${escapeHtml(a.name || 'Unnamed Agent')}</strong>
+        <div style="color:var(--text3);font-size:.82em;margin-top:2px">${shortAddr(a.address)}</div>
+      </div>
+      <div class="price">${a.price_per_request ? fmtBaud(a.price_per_request) : '—'} <span style="font-size:.6em;color:var(--text2)">BAUD</span></div>
+    </div>
+    ${caps.length > 0 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">${caps.map(c => `<span class="category">${escapeHtml(c)}</span>`).join('')}</div>` : ''}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+      <span style="color:var(--gold);font-size:.85em">${rating}</span>
+      <span style="color:var(--text3);font-size:.78em">${a.rating_count || 0} reviews</span>
+    </div>
+    ${a.endpoint ? `<a href="${escapeHtml(a.endpoint)}" target="_blank" class="btn btn-sm btn-secondary" style="width:100%;justify-content:center;margin-top:10px">Visit Endpoint</a>` : ''}
+  </div>`;
+}
+
+function filterMarketplace(category) {
+  // Highlight active filter
+  document.querySelectorAll('#marketplace-grid').forEach(() => {});
+  // Re-render with filter
+  const agents = S.marketplace || [];
+  const filtered = category === 'All' ? agents : agents.filter(a =>
+    (a.capabilities || []).some(c => c.toLowerCase().includes(category.toLowerCase()))
+  );
+  const grid = document.getElementById('marketplace-grid');
+  if (grid) grid.innerHTML = filtered.length === 0 ? renderEmptyMarketplace() : filtered.map(a => renderAgentCard(a)).join('');
+}
+
+async function registerAgent() {
+  const el = document.getElementById('mp-result');
+  el.innerHTML = '<div class="alert alert-info">Registering agent...</div>';
+  try {
+    const capStr = document.getElementById('mp-caps').value;
+    const caps = capStr.split(',').map(s => s.trim()).filter(Boolean);
+    const data = await (await fetch(API + '/v1/sign-and-submit', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        secret: document.getElementById('mp-secret').value,
+        payload: { AgentRegister: {
+          name: document.getElementById('mp-name').value,
+          endpoint: document.getElementById('mp-endpoint').value,
+          capabilities: caps
+        }},
+        nonce: parseInt(document.getElementById('mp-nonce').value) || 0
+      })
+    })).json();
+    if (data.tx_hash) {
+      el.innerHTML = `<div class="alert alert-success">Agent registered! TX: <span class="mono copyable" onclick="copyText('${data.tx_hash}')">${data.tx_hash.slice(0,16)}…</span></div>`;
+      refreshData();
+    } else {
+      el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error || 'Registration failed')}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">Network error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function updatePricing() {
+  const el = document.getElementById('price-result');
+  el.innerHTML = '<div class="alert alert-info">Updating pricing...</div>';
+  try {
+    const priceFloat = parseFloat(document.getElementById('price-amount').value) || 0;
+    const priceQuanta = BigInt(Math.round(priceFloat * 1e18)).toString();
+    const data = await (await fetch(API + '/v1/sign-and-submit', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        secret: document.getElementById('price-secret').value,
+        payload: { UpdateAgentPricing: {
+          price_per_request: priceQuanta,
+          billing_model: document.getElementById('price-model').value || 'per-request',
+          sla_description: document.getElementById('price-sla').value || ''
+        }},
+        nonce: parseInt(document.getElementById('price-nonce').value) || 0
+      })
+    })).json();
+    if (data.tx_hash) {
+      el.innerHTML = `<div class="alert alert-success">Pricing updated! TX: <span class="mono copyable" onclick="copyText('${data.tx_hash}')">${data.tx_hash.slice(0,16)}…</span></div>`;
+    } else {
+      el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error || 'Update failed')}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">Network error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function updateMarketplace() {
+  const agents = S.marketplace || [];
+  const grid = document.getElementById('marketplace-grid');
+  if (grid) grid.innerHTML = agents.length === 0 ? renderEmptyMarketplace() : agents.map(a => renderAgentCard(a)).join('');
+}
+
+// ── Governance ──
+function renderGovernance() {
+  const proposals = S.proposals || [];
+  return `<div class="page">
+    <div class="page-header">
+      <h1>Governance</h1>
+      <p>Community proposals and validator voting for protocol upgrades</p>
+    </div>
+
+    <div class="cards-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:24px">
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--primary)">${proposals.length}</div><div class="stat-label">Total Proposals</div></div>
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--green)">${proposals.filter(p => p.status === 'active').length}</div><div class="stat-label">Active Votes</div></div>
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--cyan)">${proposals.filter(p => p.status === 'passed').length}</div><div class="stat-label">Passed</div></div>
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--red)">${proposals.filter(p => p.status === 'rejected').length}</div><div class="stat-label">Rejected</div></div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="section-title">Active Proposals</div>
+        <div id="proposals-list">
+          ${proposals.length === 0 ?
+            '<div class="card" style="text-align:center;padding:32px"><p style="color:var(--text2)">No proposals yet. Create one below!</p></div>'
+            : proposals.map(p => renderProposalCard(p)).join('')}
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="section-title">Create Proposal</div>
+          <div class="form-group"><label>Secret Key</label><input type="password" id="gov-secret" placeholder="Your wallet secret key"></div>
+          <div class="form-group"><label>Title</label><input id="gov-title" placeholder="Proposal title"></div>
+          <div class="form-group"><label>Description</label><textarea id="gov-desc" rows="4" placeholder="Describe your proposal..." style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);resize:vertical"></textarea></div>
+          <div class="form-group"><label>Voting Deadline (block height)</label><input type="number" id="gov-deadline" placeholder="e.g. 500000"></div>
+          <div class="form-group"><label>Nonce</label><input type="number" id="gov-nonce" placeholder="0"></div>
+          <button class="btn btn-primary" onclick="createProposal()" style="margin-top:8px;width:100%">Submit Proposal</button>
+          <div id="gov-result" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">Cast Vote</div>
+          <div class="form-group"><label>Secret Key</label><input type="password" id="vote-secret" placeholder="Your wallet secret key"></div>
+          <div class="form-group"><label>Proposal ID</label><input id="vote-id" placeholder="Proposal ID"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-primary" onclick="castVote(true)" style="flex:1">Vote For ✓</button>
+            <button class="btn btn-danger" onclick="castVote(false)" style="flex:1">Vote Against ✗</button>
+          </div>
+          <div class="form-group" style="margin-top:8px"><label>Nonce</label><input type="number" id="vote-nonce" placeholder="0"></div>
+          <div id="vote-result" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">About Governance</div>
+          <p style="color:var(--text2);font-size:.9em;line-height:1.6">
+            The Baud governance system allows token holders to propose and vote on protocol changes.
+            Each proposal has a voting deadline (block height). Votes are weighted by token balance.
+            Proposals require a quorum to pass. All governance transactions are recorded on-chain.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderProposalCard(p) {
+  const totalVotes = (p.votes_for || 0) + (p.votes_against || 0);
+  const forPct = totalVotes > 0 ? Math.round((p.votes_for || 0) / totalVotes * 100) : 0;
+  const status = p.status || 'active';
+  const badgeClass = status === 'passed' ? 'badge-green' : status === 'rejected' ? 'badge-red' : status === 'active' ? 'badge-cyan' : 'badge-gold';
+  return `<div class="proposal-card">
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
+      <strong>${escapeHtml(p.title || 'Untitled')}</strong>
+      <span class="badge ${badgeClass}">${status.toUpperCase()}</span>
+    </div>
+    <p style="color:var(--text2);font-size:.88em;margin-bottom:8px">${escapeHtml((p.description || '').slice(0, 120))}${(p.description || '').length > 120 ? '…' : ''}</p>
+    <div style="display:flex;gap:16px;font-size:.82em;color:var(--text3)">
+      <span>ID: <span class="mono">${escapeHtml(String(p.id || ''))}</span></span>
+      <span>Deadline: Block #${fmt(p.voting_deadline)}</span>
+    </div>
+    <div class="votes-bar">
+      <div class="votes-for" style="width:${forPct}%"></div>
+      <div class="votes-against" style="width:${100 - forPct}%"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:.78em">
+      <span style="color:var(--green)">For: ${p.votes_for || 0} (${forPct}%)</span>
+      <span style="color:var(--red)">Against: ${p.votes_against || 0} (${100 - forPct}%)</span>
+    </div>
+  </div>`;
+}
+
+async function createProposal() {
+  const el = document.getElementById('gov-result');
+  el.innerHTML = '<div class="alert alert-info">Submitting proposal...</div>';
+  try {
+    const data = await (await fetch(API + '/v1/sign-and-submit', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        secret: document.getElementById('gov-secret').value,
+        payload: { CreateProposal: {
+          title: document.getElementById('gov-title').value,
+          description: document.getElementById('gov-desc').value,
+          voting_deadline: parseInt(document.getElementById('gov-deadline').value) || 0
+        }},
+        nonce: parseInt(document.getElementById('gov-nonce').value) || 0
+      })
+    })).json();
+    if (data.tx_hash) {
+      el.innerHTML = `<div class="alert alert-success">Proposal created! TX: <span class="mono copyable" onclick="copyText('${data.tx_hash}')">${data.tx_hash.slice(0,16)}…</span></div>`;
+      refreshData();
+    } else {
+      el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error || 'Failed')}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">Network error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function castVote(inFavor) {
+  const el = document.getElementById('vote-result');
+  el.innerHTML = '<div class="alert alert-info">Casting vote...</div>';
+  try {
+    const data = await (await fetch(API + '/v1/sign-and-submit', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        secret: document.getElementById('vote-secret').value,
+        payload: { CastVote: {
+          proposal_id: document.getElementById('vote-id').value,
+          in_favor: inFavor
+        }},
+        nonce: parseInt(document.getElementById('vote-nonce').value) || 0
+      })
+    })).json();
+    if (data.tx_hash) {
+      el.innerHTML = `<div class="alert alert-success">Vote cast ${inFavor ? 'FOR' : 'AGAINST'}! TX: <span class="mono copyable" onclick="copyText('${data.tx_hash}')">${data.tx_hash.slice(0,16)}…</span></div>`;
+      refreshData();
+    } else {
+      el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error || 'Vote failed')}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">Network error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function updateGovernance() {
+  const proposals = S.proposals || [];
+  _setHTML('proposals-list', proposals.length === 0 ?
+    '<div class="card" style="text-align:center;padding:32px"><p style="color:var(--text2)">No proposals yet.</p></div>'
+    : proposals.map(p => renderProposalCard(p)).join(''));
+}
+
+// ── Exchange ──
+function renderExchange() {
+  const ob = S.orderbook || { bids: [], asks: [] };
+  return `<div class="page">
+    <div class="page-header">
+      <h1>Exchange</h1>
+      <p>Decentralized order book for BAUD trading</p>
+    </div>
+
+    <div class="cards-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:24px">
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--green)">${ob.bids.length}</div><div class="stat-label">Open Bids</div></div>
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--red)">${ob.asks.length}</div><div class="stat-label">Open Asks</div></div>
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--primary)">${ob.last_price ? fmtBaud(ob.last_price) : '—'}</div><div class="stat-label">Last Price</div></div>
+      <div class="glass-card glass-stat"><div class="stat-value" style="color:var(--gold)">${ob.volume_24h ? fmtBaud(ob.volume_24h) : '0'}</div><div class="stat-label">24h Volume</div></div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="section-title">Order Book</div>
+        <div id="orderbook-display" class="order-book">
+          <div class="bids">
+            <div style="padding:8px 12px;font-size:.78em;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);display:flex;justify-content:space-between">
+              <span>Bid Price</span><span>Amount</span>
+            </div>
+            ${ob.bids.length === 0 ? '<div style="padding:16px;text-align:center;color:var(--text3);font-size:.85em">No bids</div>' :
+              ob.bids.slice(0, 15).map(b => `<div class="order-row"><span class="price-bid">${fmtBaud(b.price)}</span><span>${fmtBaud(b.amount)}</span></div>`).join('')}
+          </div>
+          <div class="asks">
+            <div style="padding:8px 12px;font-size:.78em;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);display:flex;justify-content:space-between">
+              <span>Ask Price</span><span>Amount</span>
+            </div>
+            ${ob.asks.length === 0 ? '<div style="padding:16px;text-align:center;color:var(--text3);font-size:.85em">No asks</div>' :
+              ob.asks.slice(0, 15).map(a => `<div class="order-row"><span class="price-ask">${fmtBaud(a.price)}</span><span>${fmtBaud(a.amount)}</span></div>`).join('')}
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">About the Exchange</div>
+          <p style="color:var(--text2);font-size:.9em;line-height:1.6">
+            The Baud Exchange provides a decentralized order book for trading BAUD tokens.
+            Orders are settled on-chain using escrow-backed atomic swaps.
+            Market making bots can interact via the API to provide liquidity.
+          </p>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+            <span class="badge badge-green">Escrow-Backed</span>
+            <span class="badge badge-cyan">On-Chain Settlement</span>
+            <span class="badge badge-gold">API Accessible</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="section-title">Place Order</div>
+          <div class="form-group"><label>Secret Key</label><input type="password" id="ex-secret" placeholder="Your wallet secret key"></div>
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="btn btn-primary" id="ex-buy-btn" onclick="setOrderSide('buy')" style="flex:1">Buy</button>
+            <button class="btn btn-secondary" id="ex-sell-btn" onclick="setOrderSide('sell')" style="flex:1">Sell</button>
+          </div>
+          <div class="form-group"><label>Price (BAUD per unit)</label><input type="number" id="ex-price" placeholder="1.00" step="0.01"></div>
+          <div class="form-group"><label>Amount (BAUD)</label><input type="number" id="ex-amount" placeholder="100" step="0.01"></div>
+          <div class="form-group"><label>Nonce</label><input type="number" id="ex-nonce" placeholder="0"></div>
+          <button class="btn btn-primary" onclick="placeOrder()" style="width:100%;margin-top:8px">Place Order</button>
+          <div id="ex-result" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">Recent Trades</div>
+          <div id="recent-trades">
+            ${ob.recent_trades && ob.recent_trades.length > 0 ?
+              `<div class="table-wrap"><table><thead><tr><th>Price</th><th>Amount</th><th>Side</th><th>Time</th></tr></thead><tbody>
+              ${ob.recent_trades.slice(0, 10).map(t => `<tr>
+                <td class="mono" style="color:${t.side === 'buy' ? 'var(--green)' : 'var(--red)'}">${fmtBaud(t.price)}</td>
+                <td class="mono">${fmtBaud(t.amount)}</td>
+                <td><span class="badge ${t.side === 'buy' ? 'badge-green' : 'badge-red'}">${t.side.toUpperCase()}</span></td>
+                <td style="color:var(--text3)">${new Date(t.timestamp).toLocaleTimeString()}</td>
+              </tr>`).join('')}
+              </tbody></table></div>` :
+              '<p style="color:var(--text3);text-align:center;padding:20px">No trades yet</p>'}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+let orderSide = 'buy';
+function setOrderSide(side) {
+  orderSide = side;
+  const buyBtn = document.getElementById('ex-buy-btn');
+  const sellBtn = document.getElementById('ex-sell-btn');
+  if (buyBtn && sellBtn) {
+    if (side === 'buy') {
+      buyBtn.className = 'btn btn-primary'; sellBtn.className = 'btn btn-secondary';
+    } else {
+      buyBtn.className = 'btn btn-secondary'; sellBtn.className = 'btn btn-primary';
+    }
+  }
+}
+
+async function placeOrder() {
+  const el = document.getElementById('ex-result');
+  el.innerHTML = '<div class="alert alert-info">Placing order...</div>';
+  try {
+    const priceFloat = parseFloat(document.getElementById('ex-price').value) || 0;
+    const amountFloat = parseFloat(document.getElementById('ex-amount').value) || 0;
+    const data = await (await fetch(API + '/v1/exchange/order', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        secret: document.getElementById('ex-secret').value,
+        side: orderSide,
+        price: priceFloat.toString(),
+        amount: amountFloat.toString(),
+        nonce: parseInt(document.getElementById('ex-nonce').value) || 0
+      })
+    })).json();
+    if (data.order_id || data.tx_hash) {
+      el.innerHTML = `<div class="alert alert-success">Order placed! ${data.order_id ? 'ID: ' + data.order_id : 'TX: ' + data.tx_hash}</div>`;
+      refreshData();
+    } else {
+      el.innerHTML = `<div class="alert alert-error">${escapeHtml(data.error || 'Order failed')}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">Network error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function updateExchange() {
+  // Order book is re-fetched each cycle, update display
+  renderPage(); // Full re-render for orderbook since multiple sections change
 }
 
 // ── Help ──

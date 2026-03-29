@@ -424,6 +424,10 @@ pub fn build_router_with_rate_limit(state: AppState, limiter: RateLimiter) -> Ro
         .route("/v1/lottery", get(get_lottery))
         .route("/v1/lottery/buy", post(lottery_buy))
         .route("/v1/lottery/draw", post(lottery_draw))
+        .route("/v1/marketplace", get(get_marketplace))
+        .route("/v1/proposals", get(get_proposals))
+        .route("/v1/exchange/orderbook", get(get_orderbook))
+        .route("/v1/exchange/order", post(place_order))
         .layer(RequestBodyLimitLayer::new(128 * 1024)) // 128 KiB max body
         .layer(middleware::from_fn_with_state(
             limiter,
@@ -2081,4 +2085,207 @@ async fn lottery_draw(
             "message": format!("Round {} winner: {}!", round, &winner_addr[..16]),
         })),
     ))
+}
+
+// ─── Phase 4: Marketplace ───────────────────────────────────────────────────
+
+async fn get_marketplace(State(state): State<AppState>) -> impl IntoResponse {
+    let ws = state.world_state.read();
+    let mut agents = Vec::new();
+    for (addr, account) in ws.accounts.iter() {
+        if let Some(meta) = &account.agent_meta {
+            let pricing = ws.extended.agent_pricing.get(addr);
+            let reputation = ws.extended.reputation.get(addr);
+            agents.push(serde_json::json!({
+                "address": addr.to_hex(),
+                "name": String::from_utf8_lossy(&meta.name),
+                "endpoint": String::from_utf8_lossy(&meta.endpoint),
+                "capabilities": meta.capabilities.iter()
+                    .map(|c| String::from_utf8_lossy(c).to_string())
+                    .collect::<Vec<_>>(),
+                "price_per_request": pricing.map(|p| p.price_per_request.to_string()).unwrap_or_default(),
+                "billing_model": pricing.map(|p| String::from_utf8_lossy(&p.billing_model).to_string()).unwrap_or_default(),
+                "rating": reputation.map(|r| r.average_score()).unwrap_or(0.0),
+                "successful_jobs": reputation.map(|r| r.successful_jobs).unwrap_or(0),
+            }));
+        }
+    }
+    (StatusCode::OK, Json(serde_json::json!({ "agents": agents })))
+}
+
+// ─── Phase 4: Governance Proposals List ─────────────────────────────────────
+
+async fn get_proposals(State(state): State<AppState>) -> impl IntoResponse {
+    let ws = state.world_state.read();
+    let proposals: Vec<_> = ws
+        .extended
+        .proposals
+        .iter()
+        .map(|(id, p)| {
+            let status_str = match p.status {
+                ProposalStatus::Active => "active",
+                ProposalStatus::Passed => "passed",
+                ProposalStatus::Rejected => "rejected",
+                ProposalStatus::Executed => "executed",
+            };
+            serde_json::json!({
+                "id": id.to_hex(),
+                "proposer": p.proposer.to_hex(),
+                "title": String::from_utf8_lossy(&p.title),
+                "description": String::from_utf8_lossy(&p.description),
+                "voting_deadline": p.voting_deadline,
+                "votes_for": p.votes_for,
+                "votes_against": p.votes_against,
+                "quorum": p.quorum,
+                "status": status_str,
+                "created_at_height": p.created_at_height,
+            })
+        })
+        .collect();
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "proposals": proposals })),
+    )
+}
+
+// ─── Phase 4: Exchange Order Book ───────────────────────────────────────────
+
+async fn get_orderbook(State(state): State<AppState>) -> impl IntoResponse {
+    // Derive a simple order book from open escrows (buy/sell offers).
+    let ws = state.world_state.read();
+    let mut bids = Vec::new();
+    let mut asks = Vec::new();
+
+    for (id, escrow) in ws.escrows.iter() {
+        if escrow.status == EscrowStatus::Active {
+            let entry = serde_json::json!({
+                "id": id.to_hex(),
+                "from": escrow.sender.to_hex(),
+                "to": escrow.recipient.to_hex(),
+                "amount": escrow.amount.to_string(),
+                "deadline": escrow.deadline,
+            });
+            // Treat escrows from the node's mining address as asks, others as bids.
+            if escrow.sender.to_hex() == state.node_address {
+                asks.push(entry);
+            } else {
+                bids.push(entry);
+            }
+        }
+    }
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "bids": bids,
+            "asks": asks,
+        })),
+    )
+}
+
+// ─── Phase 4: Place Exchange Order ──────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct PlaceOrderRequest {
+    pub side: String,   // "buy" or "sell"
+    pub amount: String,  // in BAUD
+    pub price: String,   // price per BAUD (placeholder for future matching)
+}
+
+async fn place_order(
+    State(state): State<AppState>,
+    Json(req): Json<PlaceOrderRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let kp = state.keypair.as_ref().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorResponse {
+                error: "node keypair not configured".into(),
+            }),
+        )
+    })?;
+
+    let amount_baud: u128 = req.amount.parse::<u128>().map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "invalid amount".into(),
+            }),
+        )
+    })?;
+    let amount = amount_baud * QUANTA_PER_BAUD;
+
+    let side = req.side.to_lowercase();
+    if side != "buy" && side != "sell" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "side must be 'buy' or 'sell'".into(),
+            }),
+        ));
+    }
+
+    // Create an escrow-backed order.
+    let nonce = {
+        let ws = state.world_state.read();
+        ws.get_account(&kp.address()).nonce
+    };
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+
+    // Use a deterministic hash-lock for the order.
+    let preimage = format!("order-{}-{}-{}", side, amount, now);
+    let hash_lock = Hash::digest(preimage.as_bytes());
+
+    let mut tx = Transaction {
+        sender: kp.address(),
+        nonce,
+        payload: TxPayload::EscrowCreate {
+            recipient: kp.address(), // self-escrow for order book
+            amount,
+            hash_lock,
+            deadline: now + 3_600_000, // 1 hour expiry
+        },
+        timestamp: now,
+        chain_id: state.chain_id.clone(),
+        signature: Signature::zero(),
+    };
+
+    let hash = tx.signable_hash();
+    tx.signature = kp.sign(hash.as_bytes());
+
+    {
+        let ws = state.world_state.read();
+        ws.validate_transaction(&tx, now).map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: format!("order validation failed: {e}"),
+                }),
+            )
+        })?;
+    }
+
+    let tx_hash = state.mempool.add(tx).map_err(|e| {
+        (
+            StatusCode::CONFLICT,
+            Json(ErrorResponse {
+                error: format!("{e}"),
+            }),
+        )
+    })?;
+
+    state.tx_processed.fetch_add(1, Ordering::Relaxed);
+
+    info!(side = %side, amount_baud = amount_baud, "exchange: order placed");
+
+    Ok(Json(serde_json::json!({
+        "tx_hash": tx_hash.to_hex(),
+        "side": side,
+        "amount_baud": amount_baud,
+        "message": format!("{} order placed for {} BAUD", side, amount_baud),
+    })))
 }
