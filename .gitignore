@@ -5,7 +5,6 @@
 .env
 *.key
 *.secret
-genesis.json
 node_data/
 testnet/
 node_modules/

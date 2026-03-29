@@ -1,0 +1,16 @@
+{
+  "chain_id": "baud-mainnet",
+  "allocations": [
+    {
+      "address": "17b28d62fb2fa94474ff54823159ddd992bed3d6fadd576bfc87c425b0b8ac1b",
+      "balance": 0
+    }
+  ],
+  "validators": [
+    {
+      "address": "17b28d62fb2fa94474ff54823159ddd992bed3d6fadd576bfc87c425b0b8ac1b",
+      "name": "validator-0"
+    }
+  ],
+  "timestamp": 1773594295747
+}
